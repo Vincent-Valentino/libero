@@ -39,6 +39,9 @@
 <script setup lang="ts">
 import { Form, Field, ErrorMessage } from 'vee-validate';
 import * as yup from 'yup';
+import { useRouter } from 'vue-router'; // Import router
+import { useAuthStore } from '@/stores/auth'; // Import auth store
+import { ref } from 'vue'; // Import ref for error message
 
 // Define validation schema using Yup
 const schema = yup.object({
@@ -46,20 +49,41 @@ const schema = yup.object({
   password: yup.string().required('Password is required'),
 });
 
-const handleLogin = async (values: any, { setErrors }: any) => {
-  console.log('Login attempt with validated values:', values);
-  // TODO: Implement Axios POST request for login
-  // try {
-  //   const response = await axios.post('/api/login', { // Replace with your actual API endpoint
-  //     email: values.email,
-  //     password: values.password.,
-  //   });
-  //   console.log('Login successful:', response.data);
-  //   // Handle successful login (e.g., store token, redirect)
-  // } catch (error) {
-  //   console.error('Login failed:', error);
-  //   // Handle login error (e.g., show error message)
-  //   // Example: setErrors({ email: 'Invalid credentials', password: ' ' }); // Set form-level or field-level errors
-  // }
+const router = useRouter();
+const authStore = useAuthStore();
+const loginError = ref<string | null>(null); // To display general login errors
+
+const handleLogin = async (values: any) => { // Removed setErrors from signature
+  loginError.value = null; // Clear previous errors
+  try {
+    await authStore.login({ email: values.email,
+ password: values.password });
+    console.log('Login successful, redirecting...');
+    // Redirect to profile or home page after successful login
+    router.push({ name: 'Profile' }); // Or 'Home'
+  } catch (error: any) {
+    console.error('Login failed in component:', error);
+    // Display error message to the user
+    // Check if the error message from the store/API is available
+    const message = error?.response?.data?.message || error?.message || 'Invalid email or password.';
+
+    // Check for specific known error messages from the backend
+    if (typeof message === 'string') {
+        if (message.toLowerCase().includes('inactive')) {
+            loginError.value = 'Your account is inactive. Please contact support.';
+        } else if (message.toLowerCase().includes('invalid email or password')) {
+            // Standard message for invalid credentials (covers user not found / wrong password)
+            loginError.value = 'Invalid email or password.';
+            // Optionally set field errors using vee-validate's setErrors
+            // setErrors({ email: ' ', password: ' ' }); // Mark both fields as potentially wrong
+        }
+         else {
+            // General error for other issues (e.g., server error)
+            loginError.value = 'Login failed. Please try again later.';
+        }
+    } else {
+        loginError.value = 'An unexpected error occurred during login.';
+    }
+  }
 };
 </script>

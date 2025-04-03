@@ -53,11 +53,30 @@
 
 <script setup lang="ts">
 // import axios from 'axios'; // Import axios when ready
+import { getGoogleLoginUrl, getFacebookLoginUrl, getGitHubLoginUrl } from '@/services/api';
 
 const handleSocialLogin = (provider: 'google' | 'facebook' | 'github') => {
   console.log(`Attempting social login with ${provider}`);
-  // TODO: Implement actual social login logic (likely involving redirects or popups)
-  // This usually requires specific SDKs or backend handling.
-  // Example: window.location.href = `/api/auth/${provider}`;
+
+  let redirectUrl: string;
+
+  switch (provider) {
+    case 'google':
+      redirectUrl = getGoogleLoginUrl();
+      break;
+    case 'facebook':
+      redirectUrl = getFacebookLoginUrl();
+      break;
+    case 'github':
+      redirectUrl = getGitHubLoginUrl();
+      break;
+    default:
+      console.error('Unknown social login provider:', provider);
+      return;
+  }
+
+  // Redirect the browser to the backend OAuth endpoint
+  // The backend will handle the redirect to the actual provider
+  window.location.href = redirectUrl;
 };
 </script>

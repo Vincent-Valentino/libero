@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"libero-backend/config" // Added config dependency
 
 	// "libero-backend/config" // Removed if not needed directly
 	"libero-backend/internal/api/controllers"
@@ -13,12 +14,10 @@ import (
 
 // SetupRoutes configures all API routes
 // It now accepts the main service struct to access all services
-func SetupRoutes(router *mux.Router, service *service.Service) {
+func SetupRoutes(router *mux.Router, service *service.Service, cfg *config.Config) { // Added cfg
 	// Extract controllers and services needed
-	// Note: Controllers are instantiated here based on the service.
-	// Alternatively, they could be instantiated in app.go and passed in.
-	userController := controllers.NewUserController(service.User)
-	oauthController := controllers.NewOAuthController(service.OAuth)
+	// Instantiate the main controller which holds sub-controllers
+	ctrl := controllers.New(service, cfg)
 	authService := service.Auth // Get AuthService for middleware
 
 	// API routes
@@ -26,34 +25,35 @@ func SetupRoutes(router *mux.Router, service *service.Service) {
 
 	// Public routes (no authentication required)
 	api.HandleFunc("/health", healthCheck).Methods(http.MethodGet)
-	api.HandleFunc("/users/register", userController.Register).Methods(http.MethodPost)
-	api.HandleFunc("/users/login", userController.Login).Methods(http.MethodPost) // Assumes Login handles password auth
+	api.HandleFunc("/auth/register", ctrl.User.Register).Methods(http.MethodPost)
+ // Changed path prefix
+	api.HandleFunc("/auth/login", ctrl.User.Login).Methods(http.MethodPost) // Changed path prefix
 
 	// OAuth routes (public) - Using root router for /auth path
 	auth := router.PathPrefix("/auth").Subrouter()
-	auth.HandleFunc("/google/login", oauthController.GoogleLogin).Methods(http.MethodGet)
-	auth.HandleFunc("/google/callback", oauthController.GoogleCallback).Methods(http.MethodGet)
-	auth.HandleFunc("/facebook/login", oauthController.FacebookLogin).Methods(http.MethodGet)
-	auth.HandleFunc("/facebook/callback", oauthController.FacebookCallback).Methods(http.MethodGet)
-	auth.HandleFunc("/github/login", oauthController.GitHubLogin).Methods(http.MethodGet)
-	auth.HandleFunc("/github/callback", oauthController.GitHubCallback).Methods(http.MethodGet)
+	auth.HandleFunc("/google/login", ctrl.Oauth.GoogleLogin).Methods(http.MethodGet)
+	auth.HandleFunc("/google/callback", ctrl.Oauth.GoogleCallback).Methods(http.MethodGet)
+	auth.HandleFunc("/facebook/login", ctrl.Oauth.FacebookLogin).Methods(http.MethodGet)
+	auth.HandleFunc("/facebook/callback", ctrl.Oauth.FacebookCallback).Methods(http.MethodGet)
+	auth.HandleFunc("/github/login", ctrl.Oauth.GitHubLogin).Methods(http.MethodGet)
+	auth.HandleFunc("/github/callback", ctrl.Oauth.GitHubCallback).Methods(http.MethodGet)
 
 	// Protected routes (authentication required)
 	protected := api.PathPrefix("").Subrouter()
 	protected.Use(middleware.AuthMiddleware(authService)) // Inject AuthService
 
 	// User routes
-	protected.HandleFunc("/users/profile", userController.GetProfile).Methods(http.MethodGet)
-	protected.HandleFunc("/users/profile", userController.UpdateProfile).Methods(http.MethodPut)
+	protected.HandleFunc("/users/profile", ctrl.User.GetProfile).Methods(http.MethodGet)
+	protected.HandleFunc("/users/profile", ctrl.User.UpdateProfile).Methods(http.MethodPut)
 
 	// Admin routes (requires admin role)
 	admin := api.PathPrefix("/admin").Subrouter()
 	admin.Use(middleware.AuthMiddleware(authService)) // Inject AuthService
 	admin.Use(middleware.RoleMiddleware("admin")) // Example role check
 
-	admin.HandleFunc("/users", userController.ListUsers).Methods(http.MethodGet)
-	admin.HandleFunc("/users/{id:[0-9]+}", userController.GetUser).Methods(http.MethodGet)
-	admin.HandleFunc("/users/{id:[0-9]+}", userController.DeleteUser).Methods(http.MethodDelete)
+	admin.HandleFunc("/users", ctrl.User.ListUsers).Methods(http.MethodGet)
+	admin.HandleFunc("/users/{id:[0-9]+}", ctrl.User.GetUser).Methods(http.MethodGet)
+	admin.HandleFunc("/users/{id:[0-9]+}", ctrl.User.DeleteUser).Methods(http.MethodDelete)
 }
 
 // healthCheck is a simple health check endpoint

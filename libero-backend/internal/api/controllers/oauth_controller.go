@@ -3,8 +3,7 @@ package controllers
 import (
 	"crypto/rand"
 	"encoding/base64"
-	// "encoding/json" // Removed previously
-	// "fmt" // Removing fmt
+	"libero-backend/config" 
 	"libero-backend/internal/service"
 	"net/http"
 	// Keep necessary imports like net/http, encoding/base64, service
@@ -13,14 +12,14 @@ import (
 // OAuthController handles OAuth authentication requests
 type OAuthController struct {
 	oauthService service.OAuthService // Only depends on the OAuthService interface
-	// userService is removed as the logic is handled within OAuthService/AuthService
+	cfg          *config.Config     // Added config dependency
 }
 
 // NewOAuthController creates a new OAuthController instance
-func NewOAuthController(oauthService service.OAuthService) *OAuthController { // Only takes OAuthService
+func NewOAuthController(oauthService service.OAuthService, cfg *config.Config) *OAuthController {
 	return &OAuthController{
 		oauthService: oauthService,
-		// userService removed
+		cfg:          cfg, // Store config
 	}
 }
 
@@ -81,9 +80,10 @@ func (ctrl *OAuthController) GoogleCallback(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Return token
-	// Assuming respondWithJSON is available from user_controller.go in the same package
-	respondWithJSON(w, http.StatusOK, map[string]string{"token": tokenString})
+	// Redirect back to frontend with token in hash fragment
+	redirectURL := ctrl.cfg.FrontendURL + "/auth/callback#token=" + tokenString
+ // Use ctrl.cfg.FrontendURL
+	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
 // --- Facebook Handlers ---
@@ -121,8 +121,11 @@ func (ctrl *OAuthController) FacebookCallback(w http.ResponseWriter, r *http.Req
 		http.Error(w, "Authentication failed.", http.StatusInternalServerError)
 		return
 	}
-	// Assuming respondWithJSON is available from user_controller.go in the same package
-	respondWithJSON(w, http.StatusOK, map[string]string{"token": tokenString})
+
+	// Redirect back to frontend with token in hash fragment
+	redirectURL := ctrl.cfg.FrontendURL + "/auth/callback#token=" + tokenString
+ // Use ctrl.cfg.FrontendURL
+	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
 // --- GitHub Handlers ---
@@ -160,8 +163,11 @@ func (ctrl *OAuthController) GitHubCallback(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "Authentication failed.", http.StatusInternalServerError)
 		return
 	}
-	// Assuming respondWithJSON is available from user_controller.go in the same package
-	respondWithJSON(w, http.StatusOK, map[string]string{"token": tokenString})
+
+	// Redirect back to frontend with token in hash fragment
+	redirectURL := ctrl.cfg.FrontendURL + "/auth/callback#token=" + tokenString
+ // Use ctrl.cfg.FrontendURL
+	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
 // Removed helper functions and unused imports.

@@ -7,12 +7,13 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	JWT      JWTConfig
-	Google   OAuthConfig
-	Facebook OAuthConfig
-	GitHub   OAuthConfig
+	Server      ServerConfig
+	Database    DatabaseConfig
+	JWT         JWTConfig
+	Google      OAuthConfig
+	Facebook    OAuthConfig
+	GitHub      OAuthConfig
+	FrontendURL string // Added Frontend URL
 }
 
 // ServerConfig holds server-specific configuration
@@ -60,32 +61,34 @@ func New() *Config {
 			SSLMode:  getEnv("DB_SSL_MODE", "disable"),
 		},
 		JWT: JWTConfig{
-			Secret:    getEnv("JWT_SECRET", "your_secret_key"),
+			Secret:    getEnv("JWT_SECRET", "your_secret_key"), // Ensure this is set securely in env
 			ExpiresIn: getEnvAsInt("JWT_EXPIRES_IN", 24*60*60), // Default: 24 hours in seconds
 		},
 		Google: OAuthConfig{
-			ClientID:     getEnv("GOOGLE_CLIENT_ID", "YOUR_GOOGLE_CLIENT_ID"),
-			ClientSecret: getEnv("GOOGLE_CLIENT_SECRET", "YOUR_GOOGLE_CLIENT_SECRET"),
+			ClientID:     getEnv("GOOGLE_CLIENT_ID", ""), // Provide actual default or ensure env var is set
+			ClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""), // Provide actual default or ensure env var is set
 			RedirectURL:  getEnv("GOOGLE_REDIRECT_URL", "http://localhost:8080/auth/google/callback"),
 		},
 		Facebook: OAuthConfig{
-			ClientID:     getEnv("FACEBOOK_CLIENT_ID", "YOUR_FACEBOOK_CLIENT_ID"),
-			ClientSecret: getEnv("FACEBOOK_CLIENT_SECRET", "YOUR_FACEBOOK_CLIENT_SECRET"),
+			ClientID:     getEnv("FACEBOOK_CLIENT_ID", ""), // Provide actual default or ensure env var is set
+			ClientSecret: getEnv("FACEBOOK_CLIENT_SECRET", ""), // Provide actual default or ensure env var is set
 			RedirectURL:  getEnv("FACEBOOK_REDIRECT_URL", "http://localhost:8080/auth/facebook/callback"),
 		},
 		GitHub: OAuthConfig{
-			ClientID:     getEnv("GITHUB_CLIENT_ID", "YOUR_GITHUB_CLIENT_ID"),
-			ClientSecret: getEnv("GITHUB_CLIENT_SECRET", "YOUR_GITHUB_CLIENT_SECRET"),
+			ClientID:     getEnv("GITHUB_CLIENT_ID", ""), // Provide actual default or ensure env var is set
+			ClientSecret: getEnv("GITHUB_CLIENT_SECRET", ""), // Provide actual default or ensure env var is set
 			RedirectURL:  getEnv("GITHUB_REDIRECT_URL", "http://localhost:8080/auth/github/callback"),
 		},
+		FrontendURL: getEnv("FRONTEND_URL", "http://localhost:5173"), // Added Frontend URL loading (default Vite port)
 	}
 }
 
 // Helper functions to get environment variables
 func getEnv(key, defaultValue string) string {
-	if value, exists := os.LookupEnv(key); exists {
+	if value, exists := os.LookupEnv(key); exists && value != "" { // Check if value is not empty
 		return value
 	}
+	// Consider logging a warning if using default for sensitive values like secrets
 	return defaultValue
 }
 

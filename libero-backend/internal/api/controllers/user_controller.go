@@ -3,6 +3,7 @@ package controllers
 import (
 	"encoding/json"
 	"net/http"
+	"errors" // Added for error checking
 	"strconv"
 
 	"github.com/gorilla/mux"
@@ -15,14 +16,14 @@ import (
 // UserController handles HTTP requests for user-related operations
 type UserController struct {
 	service service.UserService
- // Use interface value, not pointer
+	authService service.AuthService // Added AuthService dependency
 }
 
 // NewUserController creates a new user controller instance
-func NewUserController(service service.UserService) *UserController {
- // Use interface value
+func NewUserController(userService service.UserService, authService service.AuthService) *UserController {
 	return &UserController{
-		service: service,
+		service:     userService,
+		authService: authService, // Store injected AuthService
 	}
 }
 
@@ -56,6 +57,7 @@ func (c *UserController) Register(w http.ResponseWriter, r *http.Request) {
 
 // Login handles user login requests
 func (c *UserController) Login(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context() // Get context
 	var credentials struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -74,9 +76,15 @@ func (c *UserController) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Authenticate user
-	token, err := c.service.LoginUser(credentials.Email, credentials.Password)
+	token, err := c.authService.LoginByPassword(ctx, credentials.Email, credentials.Password)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		// Handle specific authentication errors
+		if errors.Is(err, service.ErrInvalidCredentials) || errors.Is(err, service.ErrAccountInactive) {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+		} else {
+			// Log internal errors (replace with proper logging later)
+			http.Error(w, "Internal server error during login", http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -124,10 +132,11 @@ func (c *UserController) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	user, err := c.service.GetUserByID(claims.UserID)
 	if err != nil {
 		// Handle user not found or other errors
-		// Improve error checking later (e.g., check for specific error type)
-		if err.Error() == "user not found (placeholder)" {
+		// Check for specific error type
+		if errors.Is(err, service.ErrUserNotFound) { // Assuming UserService returns this error
 			http.Error(w, "User not found", http.StatusNotFound)
 		} else {
+			// TODO: Add structured logging (Failed to retrieve user: %v, err)
 			http.Error(w, "Failed to retrieve user", http.StatusInternalServerError)
 		}
 		return
@@ -139,12 +148,6 @@ func (c *UserController) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	// Also, consider validation and which fields are allowed to be updated.
 	if name, ok := updates["name"].(string); ok {
 		user.Name = name
-	}
-	if firstName, ok := updates["first_name"].(string); ok {
-		user.FirstName = firstName
-	}
-	if lastName, ok := updates["last_name"].(string); ok {
-		user.LastName = lastName
 	}
 	// Add other updatable fields here (e.g., Username, but be careful with unique constraints)
 	// Do NOT update Email, Password, Role, Provider, ProviderID, etc. here unless intended.

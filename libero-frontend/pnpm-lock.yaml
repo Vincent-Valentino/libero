@@ -10,13 +10,16 @@ importers:
     dependencies:
       '@tailwindcss/vite':
         specifier: ^4.0.17
-        version: 4.0.17(vite@6.2.3(jiti@2.4.2)(lightningcss@1.29.2))
+        version: 4.0.17(vite@6.2.3(@types/node@22.13.16)(jiti@2.4.2)(lightningcss@1.29.2))
       '@vee-validate/rules':
         specifier: ^4.15.0
         version: 4.15.0(vue@3.5.13(typescript@5.7.3))
       axios:
         specifier: ^1.8.4
         version: 1.8.4
+      pinia:
+        specifier: ^3.0.1
+        version: 3.0.1(typescript@5.7.3)(vue@3.5.13(typescript@5.7.3))
       tailwindcss:
         specifier: ^4.0.17
         version: 4.0.17
@@ -33,9 +36,12 @@ importers:
         specifier: ^1.6.1
         version: 1.6.1
     devDependencies:
+      '@types/node':
+        specifier: ^22.13.16
+        version: 22.13.16
       '@vitejs/plugin-vue':
         specifier: ^5.2.1
-        version: 5.2.3(vite@6.2.3)(vue@3.5.13(typescript@5.7.3))
+        version: 5.2.3(vite@6.2.3(@types/node@22.13.16)(jiti@2.4.2)(lightningcss@1.29.2))(vue@3.5.13(typescript@5.7.3))
       '@vue/tsconfig':
         specifier: ^0.7.0
         version: 0.7.0(typescript@5.7.3)(vue@3.5.13(typescript@5.7.3))
@@ -44,7 +50,7 @@ importers:
         version: 5.7.3
       vite:
         specifier: ^6.2.0
-        version: 6.2.3(jiti@2.4.2)(lightningcss@1.29.2)
+        version: 6.2.3(@types/node@22.13.16)(jiti@2.4.2)(lightningcss@1.29.2)
       vue-tsc:
         specifier: ^2.2.4
         version: 2.2.8(typescript@5.7.3)
@@ -402,6 +408,9 @@ packages:
   '@types/estree@1.0.6':
     resolution: {integrity: sha512-AYnb1nQyY49te+VRAVgmzfcgjYS91mY5P0TKUDCLEM+gNnA+3T6rWITXRLYCpahpqSQbN5cE+gHpnPyXjHWxcw==}
 
+  '@types/node@22.13.16':
+    resolution: {integrity: sha512-15tM+qA4Ypml/N7kyRdvfRjBQT2RL461uF1Bldn06K0Nzn1lY3nAPgHlsVrJxdZ9WhZiW0Fmc1lOYMtDsAuB3w==}
+
   '@vee-validate/rules@4.15.0':
     resolution: {integrity: sha512-Cvll7r98O5tU6ew2AUifVpdhNnTkMTY7+D9N++J7apQXRXWfHMe4tNvjo4TJpKUPCtfLHbdTY/DCquDRc+uH4w==}
 
@@ -730,6 +739,15 @@ packages:
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
+  pinia@3.0.1:
+    resolution: {integrity: sha512-WXglsDzztOTH6IfcJ99ltYZin2mY8XZCXujkYWVIJlBjqsP6ST7zw+Aarh63E1cDVYeyUcPCxPHzJpEOmzB6Wg==}
+    peerDependencies:
+      typescript: '>=4.4.4'
+      vue: ^2.7.0 || ^3.5.11
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
   postcss@8.5.3:
     resolution: {integrity: sha512-dle9A3yYxlBSrt8Fu+IpjGT8SY8hN0mlaA6GY8t0P5PjIOZemULz/E2Bnm/2dcUOena75OTNkHI76uZBNUUq3A==}
     engines: {node: ^10 || ^12 || >=14}
@@ -785,6 +803,9 @@ packages:
     resolution: {integrity: sha512-84MVSjMEHP+FQRPy3pX9sTVV/INIex71s9TL2Gm5FG/WG1SqXeKyZ0k7/blY/4FdOzI12CBy1vGc4og/eus0fw==}
     engines: {node: '>=14.17'}
     hasBin: true
+
+  undici-types@6.20.0:
+    resolution: {integrity: sha512-Ny6QZ2Nju20vw1SRHe3d9jVu6gJ+4e3+MMpqu7pqE5HT6WsTSlce++GQmK5UXS8mzV8DSYHrQH+Xrf2jVcuKNg==}
 
   vee-validate@4.15.0:
     resolution: {integrity: sha512-PGJh1QCFwCBjbHu5aN6vB8macYVWrajbDvgo1Y/8fz9n/RVIkLmZCJDpUgu7+mUmCOPMxeyq7vXUOhbwAqdXcA==}
@@ -1061,15 +1082,19 @@ snapshots:
       '@tailwindcss/oxide-win32-arm64-msvc': 4.0.17
       '@tailwindcss/oxide-win32-x64-msvc': 4.0.17
 
-  '@tailwindcss/vite@4.0.17(vite@6.2.3(jiti@2.4.2)(lightningcss@1.29.2))':
+  '@tailwindcss/vite@4.0.17(vite@6.2.3(@types/node@22.13.16)(jiti@2.4.2)(lightningcss@1.29.2))':
     dependencies:
       '@tailwindcss/node': 4.0.17
       '@tailwindcss/oxide': 4.0.17
       lightningcss: 1.29.2
       tailwindcss: 4.0.17
-      vite: 6.2.3(jiti@2.4.2)(lightningcss@1.29.2)
+      vite: 6.2.3(@types/node@22.13.16)(jiti@2.4.2)(lightningcss@1.29.2)
 
   '@types/estree@1.0.6': {}
+
+  '@types/node@22.13.16':
+    dependencies:
+      undici-types: 6.20.0
 
   '@vee-validate/rules@4.15.0(vue@3.5.13(typescript@5.7.3))':
     dependencies:
@@ -1077,9 +1102,9 @@ snapshots:
     transitivePeerDependencies:
       - vue
 
-  '@vitejs/plugin-vue@5.2.3(vite@6.2.3)(vue@3.5.13(typescript@5.7.3))':
+  '@vitejs/plugin-vue@5.2.3(vite@6.2.3(@types/node@22.13.16)(jiti@2.4.2)(lightningcss@1.29.2))(vue@3.5.13(typescript@5.7.3))':
     dependencies:
-      vite: 6.2.3
+      vite: 6.2.3(@types/node@22.13.16)(jiti@2.4.2)(lightningcss@1.29.2)
       vue: 3.5.13(typescript@5.7.3)
 
   '@volar/language-core@2.4.12':
@@ -1417,6 +1442,13 @@ snapshots:
 
   picocolors@1.1.1: {}
 
+  pinia@3.0.1(typescript@5.7.3)(vue@3.5.13(typescript@5.7.3)):
+    dependencies:
+      '@vue/devtools-api': 7.7.2
+      vue: 3.5.13(typescript@5.7.3)
+    optionalDependencies:
+      typescript: 5.7.3
+
   postcss@8.5.3:
     dependencies:
       nanoid: 3.3.11
@@ -1477,26 +1509,21 @@ snapshots:
 
   typescript@5.7.3: {}
 
+  undici-types@6.20.0: {}
+
   vee-validate@4.15.0(vue@3.5.13(typescript@5.7.3)):
     dependencies:
       '@vue/devtools-api': 7.7.2
       type-fest: 4.38.0
       vue: 3.5.13(typescript@5.7.3)
 
-  vite@6.2.3:
+  vite@6.2.3(@types/node@22.13.16)(jiti@2.4.2)(lightningcss@1.29.2):
     dependencies:
       esbuild: 0.25.1
       postcss: 8.5.3
       rollup: 4.37.0
     optionalDependencies:
-      fsevents: 2.3.3
-
-  vite@6.2.3(jiti@2.4.2)(lightningcss@1.29.2):
-    dependencies:
-      esbuild: 0.25.1
-      postcss: 8.5.3
-      rollup: 4.37.0
-    optionalDependencies:
+      '@types/node': 22.13.16
       fsevents: 2.3.3
       jiti: 2.4.2
       lightningcss: 1.29.2

@@ -5,7 +5,7 @@ import (
 	"github.com/rs/cors"
 
 	"libero-backend/config"
-	// "libero-backend/internal/api/controllers" // Ensure this is removed
+
 	"libero-backend/internal/api/routes"
 	"libero-backend/internal/repository"
 	"libero-backend/internal/service"
@@ -46,7 +46,7 @@ func initApp() *App {
 
 	// Setup routes
 	// Pass the main service struct to SetupRoutes
-	routes.SetupRoutes(app.Router, app.Service)
+	routes.SetupRoutes(app.Router, app.Service, app.Config) // Pass config as well
 
 	return app
 }
