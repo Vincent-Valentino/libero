@@ -1,7 +1,7 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
 
 // Define interfaces for expected data structures
-interface LoginCredentials {
+export interface LoginCredentials { // Add export keyword
   email: string;
   password: string;
 }
@@ -17,7 +17,7 @@ interface RegisterUserData {
 }
 
 // Define a basic user profile structure (adjust based on backend's UserResponse)
-interface UserProfile {
+export interface UserProfile { // Add export keyword
   id: number;
   username: string;
   email: string;
@@ -31,6 +31,8 @@ interface UserProfile {
 // TODO: Make this configurable via environment variables (.env)
 // Use relative path for API calls; Vite proxy will handle forwarding
 const API_BASE_URL: string = '/api';
+// Explicit base URL for backend, needed for constructing full OAuth URLs
+const BACKEND_BASE_URL: string = 'http://localhost:8080'; // <-- Added
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -67,8 +69,9 @@ apiClient.interceptors.response.use(
       // Handle unauthorized access - e.g., clear token, redirect to login
       console.warn('Unauthorized access detected. Clearing token.');
       localStorage.removeItem('authToken'); // Or sessionStorage
-      // Optionally redirect: window.location.href = '/login';
-      // Or emit an event for the auth store to handle
+      // Redirect to root page
+      window.location.href = '/'; // <--- Changed & Uncommented
+      // Optionally, could use router.push('/') if router instance is available here
     }
 
     // Return the error so it can be caught by the calling code
@@ -121,7 +124,8 @@ export const getUserProfile = (): Promise<UserProfile> => {
 export const getGoogleLoginUrl = (): string => {
   // Note: We construct the full URL here, assuming the backend is at the root
   // Adjust if your setup is different (e.g., using API_BASE_URL)
-  return '/auth/google/login'; // Relative to the backend host
+  // Construct the full absolute URL to the backend endpoint
+  return `${BACKEND_BASE_URL}/auth/google/login`; // <--- Changed
 };
 
 /**
@@ -129,7 +133,7 @@ export const getGoogleLoginUrl = (): string => {
  * @returns {string}
  */
 export const getFacebookLoginUrl = (): string => {
-  return '/auth/facebook/login'; // Relative to the backend host
+  return `${BACKEND_BASE_URL}/auth/facebook/login`; // <--- Changed
 };
 
 /**
@@ -137,7 +141,7 @@ export const getFacebookLoginUrl = (): string => {
  * @returns {string}
  */
 export const getGitHubLoginUrl = (): string => {
-  return '/auth/github/login'; // Relative to the backend host
+  return `${BACKEND_BASE_URL}/auth/github/login`; // <--- Changed
 };
 
 

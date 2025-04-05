@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt" // <-- Added fmt import
 	"os"
 	"strconv"
 )
@@ -85,10 +86,27 @@ func New() *Config {
 
 // Helper functions to get environment variables
 func getEnv(key, defaultValue string) string {
-	if value, exists := os.LookupEnv(key); exists && value != "" { // Check if value is not empty
+	value, exists := os.LookupEnv(key)
+
+	// --- Add Debugging for JWT_SECRET ---
+	if key == "JWT_SECRET" {
+		if exists && value != "" {
+			fmt.Printf("DEBUG: Found JWT_SECRET in environment: '%s'\n", value)
+		} else if exists {
+			fmt.Printf("DEBUG: Found JWT_SECRET in environment but it's EMPTY. Using default.\n")
+		} else {
+			fmt.Printf("DEBUG: JWT_SECRET not found in environment. Using default.\n")
+		}
+	}
+	// --- End Debugging ---
+
+	if exists && value != "" { // Check if value is not empty
 		return value
 	}
 	// Consider logging a warning if using default for sensitive values like secrets
+	if key == "JWT_SECRET" { // Log specifically if default JWT secret is used
+		fmt.Printf("WARNING: Using default value for %s\n", key)
+	}
 	return defaultValue
 }
 

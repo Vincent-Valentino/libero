@@ -2,8 +2,8 @@ package controllers
 
 import (
 	"encoding/json"
-	"net/http"
 	"errors" // Added for error checking
+	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
@@ -29,22 +29,36 @@ func NewUserController(userService service.UserService, authService service.Auth
 
 // Register handles user registration requests
 func (c *UserController) Register(w http.ResponseWriter, r *http.Request) {
-	var user models.User
+	// Define a temporary struct to decode the request body, including the password
+	var input struct {
+		Email    string `json:"email"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
 
-	// Parse request body
-	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+	// Parse request body into the temporary struct
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
 	// Validate required fields
 	// i think this part is wrong, because we haven't defined the fields in the struct yet
-	if user.Email == "" || user.Username == "" || user.Password == "" {
+	// Validate required fields from the input struct
+	if input.Email == "" || input.Username == "" || input.Password == "" {
 		http.Error(w, "Email, username and password are required", http.StatusBadRequest)
 		return
 	}
 
+	// Create the actual user model from the input
+	user := models.User{
+		Email:    input.Email,
+		Username: input.Username,
+		Password: input.Password, // Password will be hashed by BeforeSave hook
+	}
+
 	// Register user
+	// Register user (pass the address of the user struct)
 	if err := c.service.RegisterUser(&user); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -104,7 +118,14 @@ func (c *UserController) GetProfile(w http.ResponseWriter, r *http.Request) {
 	// Get user profile
 	user, err := c.service.GetUserByID(claims.UserID)
 	if err != nil {
-		http.Error(w, "User not found", http.StatusNotFound)
+		// Check if it's the specific "User not found" error (handled by service layer)
+		if errors.Is(err, service.ErrUserNotFound) {
+			http.Error(w, "User not found", http.StatusNotFound)
+		} else {
+			// Handle other potential errors from GetUserByID
+			// TODO: Add structured logging
+			http.Error(w, "Error fetching user profile", http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -146,8 +167,12 @@ func (c *UserController) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	// Note: This is a simplified update logic. Production code might need reflection,
 	// struct tags, or libraries like 'mergo' for more robust merging.
 	// Also, consider validation and which fields are allowed to be updated.
-	if name, ok := updates["name"].(string); ok {
-		user.Name = name
+	// Update FirstName and LastName if provided in the request
+	if firstName, ok := updates["first_name"].(string); ok {
+		user.FirstName = firstName
+	}
+	if lastName, ok := updates["last_name"].(string); ok {
+		user.LastName = lastName
 	}
 	// Add other updatable fields here (e.g., Username, but be careful with unique constraints)
 	// Do NOT update Email, Password, Role, Provider, ProviderID, etc. here unless intended.

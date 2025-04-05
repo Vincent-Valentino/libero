@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"libero-backend/config" // Added for JWT config
 	"libero-backend/internal/models" // Added for User model
+	"strings"                        // <-- Import strings package
 	"time"                           // Added for JWT expiration
 
 	"github.com/golang-jwt/jwt/v5" // Added JWT library
@@ -65,7 +66,7 @@ func (s *authService) generateJWTToken(user *models.User) (string, error) {
 	}
 	// Use a strong, configured secret key
 	if s.jwtCfg.Secret == "" || s.jwtCfg.Secret == "your_secret_key" { // Check against default/empty
-		// TODO: Add structured logging (Warning: JWT Secret is not configured or using default value.)
+		fmt.Println("WARNING: JWT Secret is not configured or using default value.") // <-- Added basic logging
 		return "", errors.New("JWT secret is not securely configured")
 	}
 
@@ -86,7 +87,7 @@ func (s *authService) generateJWTToken(user *models.User) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString([]byte(s.jwtCfg.Secret))
 	if err != nil {
-		// TODO: Add structured logging (Error signing token: %v, err)
+		fmt.Printf("ERROR: Failed to sign JWT token: %v\n", err) // <-- Added basic logging
 		return "", errors.New("could not generate token")
 	}
 
@@ -102,10 +103,13 @@ func (s *authService) LoginOrRegisterViaProvider(ctx context.Context, userInfo *
 	// 1. Check if user exists by ProviderID
 	// TODO: Replace placeholder error check with proper error type checking (e.g., errors.Is(err, gorm.ErrRecordNotFound))
 	user, err := s.userService.FindUserByProvider(ctx, userInfo.Provider, userInfo.ProviderID)
-	if err != nil && err.Error() != "user not found (placeholder)" { // Assuming placeholder error for now
-		// TODO: Add structured logging (Error finding user by provider %s (%s): %v, userInfo.Provider, userInfo.ProviderID, err)
-		return "", fmt.Errorf("database error checking provider identity")
+	// Check if an error occurred AND if that error is *not* ErrUserNotFound
+	if err != nil && !errors.Is(err, ErrUserNotFound) { // <-- Correct check using errors.Is
+		// Log actual DB error if it's not simply 'not found'
+		fmt.Printf("ERROR: Database error checking provider identity '%s'/'%s': %v\n", userInfo.Provider, userInfo.ProviderID, err)
+		return "", fmt.Errorf("database error checking provider identity: %w", err)
 	}
+	// If err is nil OR it IS ErrUserNotFound, proceed.
 
 	// 2. If user exists by ProviderID, generate token.
 	if user != nil {
@@ -118,12 +122,13 @@ func (s *authService) LoginOrRegisterViaProvider(ctx context.Context, userInfo *
 
 	// 3. If user does not exist by ProviderID, check by Email (if available)
 	if userInfo.Email != "" {
-		// TODO: Replace placeholder error check with proper error type checking
 		existingUserByEmail, emailErr := s.userService.FindUserByEmail(ctx, userInfo.Email)
-		if emailErr != nil && emailErr.Error() != "user not found (placeholder)" { // Assuming placeholder error for now
-			// TODO: Add structured logging (Error finding user by email %s: %v, userInfo.Email, emailErr)
-			return "", fmt.Errorf("database error checking email")
+		// Check if an error occurred AND if that error is *not* ErrUserNotFound
+		if emailErr != nil && !errors.Is(emailErr, ErrUserNotFound) {
+			fmt.Printf("ERROR: Database error checking email '%s': %v\n", userInfo.Email, emailErr) // Log actual DB error
+			return "", fmt.Errorf("database error checking email: %w", emailErr)
 		}
+		// If emailErr is nil OR it IS ErrUserNotFound, proceed.
 
 		if existingUserByEmail != nil {
 			// User exists with this email but different/no provider link. Link them.
@@ -132,8 +137,13 @@ func (s *authService) LoginOrRegisterViaProvider(ctx context.Context, userInfo *
 			existingUserByEmail.ProviderID = userInfo.ProviderID
 			// Potentially update Name if empty or different?
 			needsUpdate := false
-			if existingUserByEmail.Name == "" && userInfo.Name != "" {
-				existingUserByEmail.Name = userInfo.Name
+			// Update FirstName/LastName if empty in the existing record
+			if existingUserByEmail.FirstName == "" && userInfo.FirstName != "" {
+				existingUserByEmail.FirstName = userInfo.FirstName
+				needsUpdate = true
+			}
+			if existingUserByEmail.LastName == "" && userInfo.LastName != "" {
+				existingUserByEmail.LastName = userInfo.LastName
 				needsUpdate = true
 			}
 			// Add other fields to potentially update here
@@ -151,14 +161,37 @@ func (s *authService) LoginOrRegisterViaProvider(ctx context.Context, userInfo *
 
 	// 4. If user still not found, create a new user.
 	// TODO: Add structured logging (AuthService: Creating new user for provider %s, email %s, userInfo.Provider, userInfo.Email)
+	fmt.Printf("AuthService: Creating new user for provider %s, email %s\n", userInfo.Provider, userInfo.Email) // Keep or enhance logging
+	// Generate a default username if none provided by OAuth user info
+	defaultUsername := ""
+	if userInfo.Email != "" {
+		emailParts := strings.Split(userInfo.Email, "@") // Use imported strings package
+		if len(emailParts) > 0 && emailParts[0] != "" {
+			defaultUsername = emailParts[0] // Use email prefix
+		}
+	}
+	// Fallback if email is empty or prefix is empty
+	if defaultUsername == "" && userInfo.ProviderID != "" {
+		defaultUsername = fmt.Sprintf("%s_%s", userInfo.Provider, userInfo.ProviderID)
+	}
+	// Ensure username is not empty (final fallback)
+	if defaultUsername == "" {
+		defaultUsername = fmt.Sprintf("user_%s", userInfo.ProviderID) // Should be rare
+	}
+	// TODO: Add a check here to ensure the generated username is truly unique in the DB.
+	// If not unique, append random characters/numbers until it is.
+	// For now, we just generate a non-empty default.
+
 	newUser := &models.User{
-		Email:      userInfo.Email, // Ensure email is not empty if required by DB schema
-		Name:       userInfo.Name,  // Ensure name is not empty if required
+		Email:      userInfo.Email,     // Ensure email is not empty if required by DB schema
+		Username:   defaultUsername,    // Use the generated default username
+		FirstName:  userInfo.FirstName,  // Use FirstName
+		LastName:   userInfo.LastName,   // Use LastName
 		Provider:   userInfo.Provider,
 		ProviderID: userInfo.ProviderID,
 		Role:       "user", // Default role
 		Active:     true,   // Default active
-		// Password will be empty/nil initially for OAuth users.
+		// Password will be empty/nil initially for OAuth users
 	}
 	// Use CreateUser which should handle basic creation.
 	createdUser, createErr := s.userService.CreateUser(ctx, newUser)
@@ -182,7 +215,7 @@ func (s *authService) LoginByPassword(ctx context.Context, email, password strin
 			return "", ErrInvalidCredentials // Don't reveal if user exists
 		}
 		// TODO: Replace with structured logging
-		// (Error finding user by email %s during login: %v, email, err)
+		fmt.Printf("ERROR: Failed to find user by email '%s': %v\n", email, err) // <-- Added basic logging
 		return "", fmt.Errorf("error during authentication") // Generic error
 	}
 
@@ -203,7 +236,8 @@ func (s *authService) LoginByPassword(ctx context.Context, email, password strin
 	// Generate JWT token
 	tokenString, err := s.generateJWTToken(user)
 	if err != nil {
-		// Error already logged in generateJWTToken
+		// Error should be logged within generateJWTToken, but log here too for context
+		fmt.Printf("ERROR: Failed to generate JWT token after successful password check for user '%s': %v\n", user.Email, err) // <-- Added basic logging
 		return "", errors.New("could not process login") // Generic error
 	}
 

@@ -33,35 +33,36 @@ onMounted(async () => {
   if (token) {
     console.log('OAuth Callback: Token found in hash.');
     try {
-      // Store the token using the auth store action
-      authStore.setToken(token);
+      // Call the single action to handle the token and fetch profile
+      await authStore.handleAuthCallback(token);
 
-      // Fetch the user profile using the new token
-      await authStore.fetchProfile();
-
+      // After handleAuthCallback completes, check the store's state
       if (authStore.isAuthenticated && authStore.user) {
-        console.log('OAuth Callback: Profile fetched successfully. Redirecting to profile.');
-        // Redirect to the user's profile page or dashboard
-        router.push({ name: 'Profile' }); // Or 'Home' or a saved redirect path
+        console.log('OAuth Callback: handleAuthCallback successful. Redirecting to Home.');
+        // Redirect to the root page or intended destination
+        router.push({ name: 'Home' }); // Or potentially a stored 'redirectAfterLogin' path
       } else {
-        // This case might happen if fetchProfile fails despite having a token
-        console.error('OAuth Callback: Failed to fetch profile after setting token.');
-        error.value = 'Login successful, but failed to retrieve user details. Please try logging in again.';
-        authStore.clearAuth(); // Clear potentially invalid token
-        // Redirect to login after a delay or keep the error message displayed
-        setTimeout(() => router.push({ name: 'Auth' }), 4000);
+        // This case means handleAuthCallback finished but the user is not authenticated
+        // (likely because the profile fetch within it failed and triggered logout)
+        console.error('OAuth Callback: handleAuthCallback completed, but user is not authenticated. Profile fetch likely failed.');
+        // Use the error message potentially set in the store by fetchUserProfile failure
+        error.value = authStore.error || 'Login succeeded, but failed to load user details. Please try again.';
+        // No need to call clearAuth here, as handleAuthCallback/fetchUserProfile should have handled it
+        setTimeout(() => router.push({ name: 'Home' }), 4000); // Redirect home on error
       }
-    } catch (err) {
-      console.error('OAuth Callback: Error processing token or fetching profile:', err);
-      error.value = 'An error occurred during the final login step. Please try again.';
-      authStore.clearAuth();
-      setTimeout(() => router.push({ name: 'Auth' }), 4000);
+    } catch (err: any) {
+      // Catch any unexpected errors during handleAuthCallback itself
+      console.error('OAuth Callback: Unexpected error during handleAuthCallback:', err);
+      error.value = err.message || 'An unexpected error occurred during login processing. Please try again.';
+      // Ensure state is cleared if an unexpected error occurs
+      authStore.logout(); // Use the logout action to clear state
+      setTimeout(() => router.push({ name: 'Home' }), 4000); // Redirect home on error
     }
   } else {
     console.error('OAuth Callback: No token found in URL hash.');
     error.value = 'Authentication callback failed. No token received. Redirecting to login.';
     // Redirect back to login page if no token is present
-    setTimeout(() => router.push({ name: 'Auth' }), 3000);
+    setTimeout(() => router.push({ name: 'Home' }), 3000); // Redirect home if no token
   }
 });
 </script>

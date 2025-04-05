@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"libero-backend/config"
+	"strings" // <-- Added strings import
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/facebook"
@@ -83,7 +84,8 @@ type UserInfo struct {
 	Provider     string
 	ProviderID   string
 	Email        string
-	Name         string
+	FirstName    string // Changed from Name
+	LastName     string // Added LastName
 	AccessToken  string // The provider's access token
 	RefreshToken string // Optional: The provider's refresh token
 	RawData      map[string]interface{} // Raw data from provider for flexibility
@@ -109,45 +111,71 @@ func (s *oauthService) HandleGoogleCallback(ctx context.Context, storedState str
 		return "", errors.New("invalid oauth state")
 	}
 
+	fmt.Println("OAuthService: Exchanging Google code for token...") // <-- Log Start
 	token, err := s.GoogleConfig.Exchange(ctx, code)
 	if err != nil {
+		fmt.Printf("ERROR: Google code exchange failed: %v\n", err) // <-- Log Error
 		return "", fmt.Errorf("code exchange failed: %w", err)
 	}
+	fmt.Println("OAuthService: Google code exchange successful.") // <-- Log Success
 
 	// Fetch user info from Google API
 	client := s.GoogleConfig.Client(ctx, token)
+	fmt.Println("OAuthService: Fetching user info from Google API...") // <-- Log Start
 	response, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
 	if err != nil {
+		fmt.Printf("ERROR: Failed getting user info from Google: %v\n", err) // <-- Log Error
 		return "", fmt.Errorf("failed getting user info: %w", err)
 	}
+	fmt.Println("OAuthService: Google user info fetch successful.") // <-- Log Success
 	defer response.Body.Close()
 
 	contents, err := ioutil.ReadAll(response.Body)
 	if err != nil {
+		fmt.Printf("ERROR: Failed reading Google user info response body: %v\n", err) // <-- Log Error
 		return "", fmt.Errorf("failed reading user info response body: %w", err)
 	}
 
 	var googleUserInfo map[string]interface{}
 	if err := json.Unmarshal(contents, &googleUserInfo); err != nil {
+		fmt.Printf("ERROR: Failed to unmarshal Google user info JSON: %v\n", err) // <-- Log Error
 		return "", fmt.Errorf("failed to unmarshal google user info: %w", err)
 	}
 
-	// Extract necessary fields
+	// Extract necessary fields, attempting to get first/last name
+	firstName := fmt.Sprintf("%v", googleUserInfo["given_name"])
+	lastName := fmt.Sprintf("%v", googleUserInfo["family_name"])
+	// Fallback to full name if separate names aren't available
+	fullName := fmt.Sprintf("%v", googleUserInfo["name"])
+	if firstName == "" && lastName == "" && fullName != "" {
+		// Basic split on space, might not be perfect for all names
+		parts := strings.SplitN(fullName, " ", 2)
+		firstName = parts[0]
+		if len(parts) > 1 {
+			lastName = parts[1]
+		}
+	}
+
 	userInfo := &UserInfo{
 		Provider:     "google",
 		ProviderID:   fmt.Sprintf("%v", googleUserInfo["id"]),
 		Email:        fmt.Sprintf("%v", googleUserInfo["email"]),
-		Name:         fmt.Sprintf("%v", googleUserInfo["name"]),
+		FirstName:    firstName, // Use parsed first name
+		LastName:     lastName,  // Use parsed last name
 		AccessToken:  token.AccessToken,
 		RefreshToken: token.RefreshToken,
 		RawData:      googleUserInfo,
 	}
 
 	// Call AuthService to handle login or registration
+	fmt.Println("OAuthService: Calling AuthService.LoginOrRegisterViaProvider...") // <-- Log Start
 	tokenString, err := s.authService.LoginOrRegisterViaProvider(ctx, userInfo)
 	if err != nil {
+		// This could fail due to DB issues, JWT secret issues within AuthService, etc.
+		fmt.Printf("ERROR: AuthService.LoginOrRegisterViaProvider failed: %v\n", err) // <-- Log Error
 		return "", fmt.Errorf("failed to login or register via google: %w", err)
 	}
+	fmt.Println("OAuthService: AuthService.LoginOrRegisterViaProvider successful.") // <-- Log Success
 
 	return tokenString, nil
 }
@@ -170,42 +198,62 @@ func (s *oauthService) HandleFacebookCallback(ctx context.Context, storedState s
 
 	token, err := s.FacebookConfig.Exchange(ctx, code)
 	if err != nil {
+		// Consider adding structured logging here for production
 		return "", fmt.Errorf("code exchange failed: %w", err)
 	}
 
 	// Fetch user info from Facebook Graph API
 	client := s.FacebookConfig.Client(ctx, token)
 	// Use the token directly in the URL as Facebook's client might not automatically add it
-	resp, err := client.Get("https://graph.facebook.com/me?fields=id,name,email&access_token=" + token.AccessToken)
+	userInfoURL := "https://graph.facebook.com/me?fields=id,first_name,last_name,name,email&access_token=" + token.AccessToken
+	resp, err := client.Get(userInfoURL)
 	if err != nil {
+		// Consider adding structured logging here for production
 		return "", fmt.Errorf("failed getting user info from facebook: %w", err)
 	}
 	defer resp.Body.Close()
 
 	contents, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		// Consider adding structured logging here for production
 		return "", fmt.Errorf("failed reading facebook user info response body: %w", err)
 	}
 
 	var fbUserInfo map[string]interface{}
 	if err := json.Unmarshal(contents, &fbUserInfo); err != nil {
+		// Consider adding structured logging here for production
 		return "", fmt.Errorf("failed to unmarshal facebook user info: %w", err)
 	}
 
-	// Extract necessary fields
+	// Extract necessary fields, attempting to get first/last name
+	// Facebook often provides first_name, last_name directly
+	firstNameFb := fmt.Sprintf("%v", fbUserInfo["first_name"])
+	lastNameFb := fmt.Sprintf("%v", fbUserInfo["last_name"])
+	fullNameFb := fmt.Sprintf("%v", fbUserInfo["name"])
+	if firstNameFb == "" && lastNameFb == "" && fullNameFb != "" {
+		parts := strings.SplitN(fullNameFb, " ", 2)
+		firstNameFb = parts[0]
+		if len(parts) > 1 {
+			lastNameFb = parts[1]
+		}
+	}
+
 	userInfo := &UserInfo{
 		Provider:     "facebook",
 		ProviderID:   fmt.Sprintf("%v", fbUserInfo["id"]),
-		Email:        fmt.Sprintf("%v", fbUserInfo["email"]), // May be empty if user didn't grant permission
-		Name:         fmt.Sprintf("%v", fbUserInfo["name"]),
+		Email:        fmt.Sprintf("%v", fbUserInfo["email"]), // May be empty
+		FirstName:    firstNameFb,
+		LastName:     lastNameFb,
 		AccessToken:  token.AccessToken,
-		RefreshToken: token.RefreshToken, // Facebook might not provide refresh tokens by default
+		RefreshToken: token.RefreshToken,
 		RawData:      fbUserInfo,
 	}
 
 	// Call AuthService to handle login or registration
+	// Call AuthService to handle login or registration
 	tokenString, err := s.authService.LoginOrRegisterViaProvider(ctx, userInfo)
 	if err != nil {
+		// Consider adding structured logging here for production
 		return "", fmt.Errorf("failed to login or register via facebook: %w", err)
 	}
 
@@ -230,6 +278,7 @@ func (s *oauthService) HandleGitHubCallback(ctx context.Context, storedState str
 
 	token, err := s.GitHubConfig.Exchange(ctx, code)
 	if err != nil {
+		// Consider adding structured logging here for production
 		return "", fmt.Errorf("code exchange failed: %w", err)
 	}
 
@@ -237,17 +286,20 @@ func (s *oauthService) HandleGitHubCallback(ctx context.Context, storedState str
 	client := s.GitHubConfig.Client(ctx, token)
 	resp, err := client.Get("https://api.github.com/user")
 	if err != nil {
+		// Consider adding structured logging here for production
 		return "", fmt.Errorf("failed getting user info from github: %w", err)
 	}
 	defer resp.Body.Close()
 
 	contents, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		// Consider adding structured logging here for production
 		return "", fmt.Errorf("failed reading github user info response body: %w", err)
 	}
 
 	var ghUserInfo map[string]interface{}
 	if err := json.Unmarshal(contents, &ghUserInfo); err != nil {
+		// Consider adding structured logging here for production
 		return "", fmt.Errorf("failed to unmarshal github user info: %w", err)
 	}
 
@@ -263,12 +315,24 @@ func (s *oauthService) HandleGitHubCallback(ctx context.Context, storedState str
 		// Handle emailsResp and emailsErr... find primary email
 	}
 
-	// Extract necessary fields
+	// Extract necessary fields, attempting to get first/last name
+	fullNameGh := fmt.Sprintf("%v", ghUserInfo["name"]) // GitHub often only provides full name
+	firstNameGh := ""
+	lastNameGh := ""
+	if fullNameGh != "" {
+		parts := strings.SplitN(fullNameGh, " ", 2)
+		firstNameGh = parts[0]
+		if len(parts) > 1 {
+			lastNameGh = parts[1]
+		}
+	}
+
 	userInfo := &UserInfo{
 		Provider:     "github",
 		ProviderID:   fmt.Sprintf("%.0f", ghUserInfo["id"]), // GitHub ID is often a number
 		Email:        email,
-		Name:         fmt.Sprintf("%v", ghUserInfo["name"]), // May be empty
+		FirstName:    firstNameGh,
+		LastName:     lastNameGh,
 		AccessToken:  token.AccessToken,
 		RefreshToken: token.RefreshToken,
 		RawData:      ghUserInfo,
@@ -277,6 +341,7 @@ func (s *oauthService) HandleGitHubCallback(ctx context.Context, storedState str
 	// Call AuthService to handle login or registration
 	tokenString, err := s.authService.LoginOrRegisterViaProvider(ctx, userInfo)
 	if err != nil {
+		// Consider adding structured logging here for production
 		return "", fmt.Errorf("failed to login or register via github: %w", err)
 	}
 

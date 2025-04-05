@@ -1,213 +1,237 @@
-# Authentication Implementation Plan (`auth_plan.md`)
+# Authentication and Routing Configuration Plan
 
-This plan outlines the steps to implement a robust authentication system for the Libero application, covering both backend (Go) and frontend (Vue.js) components, including standard credentials and OAuth (Google, Facebook, GitHub).
+## Goal
 
-**Goals:**
+Configure the routing and authentication flow for the `libero-frontend` and `libero-backend` application. This includes:
+1.  Fixing the Google OAuth login flow (currently showing a blank page).
+2.  Implementing frontend 404 handling: Redirect invalid frontend routes to `/`.
+3.  Implementing authentication required handling: Redirect unauthenticated users trying to access protected routes or receiving a 401 API response to `/`.
+4.  Implementing post-login handling: Redirect users to `/` after successful login/OAuth callback.
+5.  Ensuring backend 404 API errors are handled locally in the component without a redirect.
 
-1.  **Backend:** Refactor and solidify the authentication logic within the Go backend, ensuring clear separation of concerns and secure practices.
-2.  **Frontend:** Implement user-facing login, registration, and OAuth flows in the Vue.js application.
-3.  **Integration:** Ensure seamless communication and state management between the frontend and backend.
+## Backend Base URL
 
-### 1. Backend Refinements (Go - `libero-backend`)
+The backend server is assumed to be running at: `http://localhost:8080`
 
-#### 1.1. Consolidate Authentication Logic in `AuthService`
+## Required Changes
 
-*   **Action:** Move the password comparison and JWT generation logic currently invoked by `UserController.Login` into `AuthService.LoginByPassword`.
-*   **Details:**
-    *   `AuthService.LoginByPassword` will take email and password.
-    *   It will call `UserService.FindUserByEmail` to retrieve the user.
-    *   It will perform password comparison using `user.ComparePassword`.
-    *   It will check if the user account is active (`user.Active`).
-    *   If successful, it will generate and return the JWT using `authService.generateJWTToken`.
-    *   Return appropriate errors (`ErrInvalidCredentials`, `ErrAccountInactive`, etc.).
-*   **File:** `internal/service/auth_service.go`
+### 1. Modify `libero-frontend/src/services/api.ts`
 
-#### 1.2. Refactor `UserController` for Login
+*   **Update OAuth URL functions:** Prepend the full backend base URL (`http://localhost:8080`) to the relative paths (`/auth/google/login`, etc.).
+*   **Update 401 Interceptor:** Ensure the response interceptor redirects the user to the root (`/`) upon receiving a 401 Unauthorized status from the backend.
 
-*   **Action:** Modify `UserController.Login` to call the refactored `AuthService.LoginByPassword`.
-*   **Details:**
-    *   Inject `AuthService` into `UserController`.
-    *   `UserController.Login` will parse credentials and call `authService.LoginByPassword`.
-    *   Handle errors returned from `AuthService` and map them to appropriate HTTP status codes (e.g., `ErrInvalidCredentials` -> 401 Unauthorized).
-*   **File:** `internal/api/controllers/user_controller.go`
+```typescript
+// libero-frontend/src/services/api.ts
+import axios, { type AxiosInstance, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
 
-#### 1.3. Enhance Error Handling & Logging
+// ... (interfaces) ...
 
-*   **Action:** Replace placeholder error checks and `fmt.Println` with proper error type checking (using `errors.Is`, `errors.As`) and structured logging (e.g., using a library like `logrus` or `zap`).
-*   **Details:**
-    *   Check for specific database errors (e.g., `gorm.ErrRecordNotFound`) in services/repositories.
-    *   Define custom error types or use sentinel errors consistently.
-    *   Implement a logging middleware or integrate logging within handlers/services.
-*   **Files:** Affects most `service`, `controller`, and potentially `repository` files.
+// Base URL for the backend API (for proxied requests)
+const API_BASE_URL: string = '/api';
+// Explicit base URL for backend, needed for constructing full OAuth URLs
+const BACKEND_BASE_URL: string = 'http://localhost:8080'; // <-- Added
 
-#### 1.4. Secure Configuration
+const apiClient: AxiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
-*   **Action:** Ensure sensitive configurations (JWT Secret, OAuth Client IDs/Secrets, Database credentials) are loaded securely, preferably from environment variables or a dedicated secrets management system, not hardcoded.
-*   **Details:**
-    *   Verify that the `config` package loads values from the environment.
-    *   Add checks on startup to ensure critical secrets are present.
-    *   Update `.gitignore` to ensure no credential files are committed.
-*   **Files:** `config/config.go`, potentially deployment scripts or environment setup.
+// Request Interceptor: Add JWT token
+apiClient.interceptors.request.use(
+  (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
+    const token: string | null = localStorage.getItem('authToken');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error: any): Promise<any> => {
+    return Promise.reject(error);
+  }
+);
 
-#### 1.5. Define API Routes
+// Response Interceptor: Handle common errors
+apiClient.interceptors.response.use(
+  (response: AxiosResponse): AxiosResponse => {
+    return response;
+  },
+  (error: any): Promise<any> => {
+    console.error('API Error:', error.response?.data || error.message);
 
-*   **Action:** Ensure all necessary authentication and user routes are clearly defined and protected appropriately.
-*   **Details:**
-    *   **Public Routes:**
-        *   `POST /api/auth/register` (`UserController.Register`)
-        *   `POST /api/auth/login` (`UserController.Login`)
-        *   `GET /api/oauth/{provider}/login` (e.g., `/api/oauth/google/login`) (`OAuthController.ProviderLogin`)
-        *   `GET /api/oauth/{provider}/callback` (e.g., `/api/oauth/google/callback`) (`OAuthController.ProviderCallback`)
-    *   **Protected Routes (using `AuthMiddleware`):**
-        *   `GET /api/users/profile` (`UserController.GetProfile`)
-        *   `PUT /api/users/profile` (`UserController.UpdateProfile`)
-        *   Potentially other user routes (`GET /api/users`, `GET /api/users/{id}`, etc.) might require admin roles (`RoleMiddleware`).
-*   **File:** `internal/api/routes/routes.go`
+    if (error.response && error.response.status === 401) {
+      console.warn('Unauthorized access detected. Clearing token and redirecting to root.');
+      localStorage.removeItem('authToken');
+      // Redirect to root page
+      window.location.href = '/'; // <--- Changed & Uncommented
+    }
+    // 404s will naturally reject and be handled by calling code
 
-### 2. Frontend Implementation (Vue.js - `libero-frontend`)
+    return Promise.reject(error);
+  }
+);
 
-#### 2.1. API Service Utility
+// ... (loginUser, registerUser, getUserProfile) ...
 
-*   **Action:** Create a utility/service (e.g., `src/services/api.js` or using `axios`) to handle communication with the backend API.
-*   **Details:**
-    *   Configure base URL.
-    *   Implement functions for specific endpoints (login, register, getProfile, OAuth URLs).
-    *   Set up request interceptors to automatically attach the JWT (Bearer token) from storage to authenticated requests.
-    *   Set up response interceptors for centralized error handling (e.g., redirecting to login on 401 errors).
+// --- OAuth ---
 
-#### 2.2. Authentication State Management (Pinia/Vuex/Composition API)
+export const getGoogleLoginUrl = (): string => {
+  // Construct the full absolute URL to the backend endpoint
+  return `${BACKEND_BASE_URL}/auth/google/login`; // <--- Changed
+};
 
-*   **Action:** Implement a store or use the Composition API to manage authentication state globally.
-*   **Details:**
-    *   State variables: `isAuthenticated` (boolean), `user` (object or null), `token` (string or null), `status` (e.g., 'loading', 'success', 'error').
-    *   Actions/Mutations: `login`, `register`, `logout`, `fetchProfile`, `handleOAuthCallback`.
-    *   Getters/Computed Props: `isAuthenticated`, `currentUser`.
-    *   Persist token to `localStorage` or `sessionStorage` upon successful login/OAuth.
-    *   Initialize state from storage on application load.
+export const getFacebookLoginUrl = (): string => {
+  return `${BACKEND_BASE_URL}/auth/facebook/login`; // <--- Changed
+};
 
-#### 2.3. Vue Router Setup
+export const getGitHubLoginUrl = (): string => {
+  return `${BACKEND_BASE_URL}/auth/github/login`; // <--- Changed
+};
 
-*   **Action:** Configure Vue Router to define public and protected routes.
-*   **Details:**
-    *   Public routes: `/login`, `/register`.
-    *   Protected routes: `/dashboard`, `/profile`, etc.
-    *   Implement navigation guards (`router.beforeEach`) that check the authentication state (from the store) before allowing access to protected routes. Redirect unauthenticated users to `/login`.
-    *   Add a route like `/auth/callback` to handle the redirect from the backend after OAuth.
-
-#### 2.4. UI Components
-
-*   **Action:** Create Vue components for authentication views.
-*   **Details:**
-    *   `Login.vue`: Form with email/password fields, submit button, links to register and OAuth providers. Calls the `login` action from the store.
-    *   `Register.vue`: Form with username, email, password fields, submit button. Calls the `register` action.
-    *   `OAuthButtons.vue` (optional): Component displaying buttons for Google, Facebook, GitHub login. Clicking a button redirects the user to the corresponding backend URL (`/api/oauth/{provider}/login`).
-    *   `AuthCallback.vue`: Component for the `/auth/callback` route. Handles extracting the token from the URL hash/query, storing it, fetching the profile, and redirecting.
-
-#### 2.5. OAuth Flow Handling (Frontend)
-
-*   **Refined Flow:**
-    1.  User clicks OAuth button -> Redirect to `GET /api/oauth/{provider}/login`.
-    2.  Backend redirects to OAuth provider.
-    3.  User authenticates with provider.
-    4.  Provider redirects to `GET /api/oauth/{provider}/callback`.
-    5.  Backend handles callback, gets/creates user, generates JWT.
-    6.  Backend redirects to frontend `https://your-frontend.com/auth/callback#token=JWT_TOKEN_HERE`.
-    7.  Frontend (`AuthCallback.vue`) extracts token from hash, stores it, fetches profile, redirects to dashboard.
-*   **Action:** Implement the `AuthCallback.vue` component and the logic within the auth store to handle this flow.
-
-#### 2.6. Form Validation
-
-*   **Action:** Add client-side validation to Login and Register forms.
-*   **Details:** Use a library like `Vuelidate` or built-in Vue 3 validation.
-
-### 3. Diagrams
-
-#### 3.1. Password Login Sequence Diagram
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Frontend (Vue)
-    participant Backend API (Go)
-    participant AuthService
-    participant UserService
-    participant Database
-
-    User->>Frontend (Vue): Enters email & password, clicks Login
-    Frontend (Vue)->>Backend API (Go): POST /api/auth/login (credentials)
-    Backend API (Go)->>AuthService: LoginByPassword(email, password)
-    AuthService->>UserService: FindUserByEmail(email)
-    UserService->>Database: Query user by email
-    Database-->>UserService: User record (with hashed password)
-    UserService-->>AuthService: User object
-    alt User Found & Active
-        AuthService->>AuthService: ComparePassword(inputPassword, hashedPassword)
-        alt Password Matches
-            AuthService->>AuthService: generateJWTToken(user)
-            AuthService-->>Backend API (Go): JWT Token
-            Backend API (Go)-->>Frontend (Vue): 200 OK { token: "..." }
-            Frontend (Vue)->>Frontend (Vue): Store token, update auth state
-            Frontend (Vue)->>User: Redirect to Dashboard/Profile
-        else Password Mismatch
-            AuthService-->>Backend API (Go): ErrInvalidCredentials
-            Backend API (Go)-->>Frontend (Vue): 401 Unauthorized
-            Frontend (Vue)->>User: Show "Invalid credentials" error
-        end
-    else User Not Found or Inactive
-        AuthService-->>Backend API (Go): ErrInvalidCredentials or ErrAccountInactive
-        Backend API (Go)-->>Frontend (Vue): 401 Unauthorized
-        Frontend (Vue)->>User: Show "Invalid credentials" error
-    end
-
+export default apiClient;
 ```
 
-#### 3.2. OAuth Login Sequence Diagram (Example: Google)
+### 2. Modify `libero-frontend/src/router/index.ts`
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant Frontend (Vue)
-    participant Backend API (Go)
-    participant Google
-    participant AuthService
-    participant UserService
-    participant Database
+*   **Add Catch-all Route:** Add a route definition (`path: '/:pathMatch(.*)*'`) at the end of the `routes` array that redirects any unmatched paths to the Home route (`/`).
+*   **Update Navigation Guard:** Modify the `router.beforeEach` guard to redirect to `{ name: 'Home' }` (path `/`) when `requiresAuth` is true but the user is not authenticated.
 
-    User->>Frontend (Vue): Clicks "Login with Google"
-    Frontend (Vue)->>Backend API (Go): Redirect to GET /api/oauth/google/login
-    Backend API (Go)->>Backend API (Go): Generate state, Get AuthCodeURL
-    Backend API (Go)->>User: Redirect to Google Auth URL (with state)
-    User->>Google: Authenticates with Google Account
-    Google->>Backend API (Go): Redirect to GET /api/oauth/google/callback (with code, state)
-    Backend API (Go)->>Backend API (Go): Validate state
-    Backend API (Go)->>Google: Exchange code for Google token
-    Google-->>Backend API (Go): Google Access Token
-    Backend API (Go)->>Google: Get User Info (using token)
-    Google-->>Backend API (Go): Google User Info (ID, email, name)
-    Backend API (Go)->>AuthService: LoginOrRegisterViaProvider(googleUserInfo)
-    AuthService->>UserService: FindUserByProvider(provider, providerId) or FindUserByEmail(email)
-    UserService->>Database: Query user
-    alt User Found/Linked
-        Database-->>UserService: Existing User
-        UserService-->>AuthService: Existing User
-    else User Not Found
-        Database-->>UserService: Not Found
-        UserService-->>AuthService: Not Found
-        AuthService->>UserService: CreateUser(newUser)
-        UserService->>Database: Insert new user
-        Database-->>UserService: Created User
-        UserService-->>AuthService: Created User
-    end
-    AuthService->>AuthService: generateJWTToken(user)
-    AuthService-->>Backend API (Go): JWT Token
-    Backend API (Go)->>User: Redirect to Frontend URL (e.g., /auth/callback#token=JWT)
-    User->>Frontend (Vue): Access /auth/callback#token=JWT
-    Frontend (Vue)->>Frontend (Vue): Extract token from URL hash
-    Frontend (Vue)->>Frontend (Vue): Store token, update auth state
-    Frontend (Vue)->>Backend API (Go): GET /api/users/profile (with token)
-    Backend API (Go)-->>Frontend (Vue): User Profile Data
-    Frontend (Vue)->>Frontend (Vue): Update user state
-    Frontend (Vue)->>User: Redirect to Dashboard/Profile
+```typescript
+// libero-frontend/src/router/index.ts
+import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router';
+import Home from '../home/Home.vue';
+import Auth from '../auth/Auth.vue';
+const AuthCallback = { template: '<div>Processing login...</div>' }; // Placeholder
+const UserProfile = { template: '<div>User Profile Page (Protected)</div>' };
+import LeaguePage from '../leagues/LeaguePage.vue';
+// ... (other imports) ...
+import { useAuthStore } from '@/stores/auth';
+
+const routes: Array<RouteRecordRaw> = [
+  { path: '/', name: 'Home', component: Home },
+  { path: '/auth', name: 'Auth', component: Auth, meta: { guestOnly: true } },
+  { path: '/auth/callback', name: 'AuthCallback', component: AuthCallback }, // Needs implementation
+  { path: '/profile', name: 'Profile', component: UserProfile, meta: { requiresAuth: true } },
+  // ... (league routes, etc.) ...
+
+  // Catch-all route for 404 errors - MUST BE LAST
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    redirect: { name: 'Home' } // Redirect to the root page
+  } // <--- Added
+];
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+});
+
+// Navigation Guard
+router.beforeEach((to, _, next) => {
+  const authStore = useAuthStore();
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
+  const guestOnly = to.matched.some(record => record.meta.guestOnly);
+  const isAuthenticated = authStore.isAuthenticated;
+
+  if (requiresAuth && !isAuthenticated) {
+    console.log(`Navigation Guard: Route ${to.path} requires auth. Redirecting to /.`);
+    next({ name: 'Home' }); // <--- Changed from 'Auth'
+  } else if (guestOnly && isAuthenticated) {
+    console.log(`Navigation Guard: Route ${to.path} is guest only. Redirecting to /.`);
+    next({ name: 'Home' });
+  } else {
+    next();
+  }
+});
+
+export default router;
 ```
 
----
+### 3. Implement `libero-frontend/src/auth/AuthCallback.vue`
+
+This component needs implementation to handle the redirect back from the backend after successful OAuth.
+
+*   **Logic:**
+    1.  Check `window.location.hash` for `#token=...`.
+    2.  Extract the token value.
+    3.  Use the `useAuthStore` to store the token (e.g., in `localStorage`) and update the application's auth state.
+    4.  Use the router (`useRouter`) to navigate the user to the root (`/`) via `router.push({ name: 'Home' })`.
+    5.  Handle cases where the token is missing or invalid.
+
+*   **Example Structure (Conceptual):**
+
+```vue
+<template>
+  <div>Processing login...</div>
+</template>
+
+<script setup lang="ts">
+import { onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/auth'; // Assuming store path
+
+const router = useRouter();
+const authStore = useAuthStore();
+
+onMounted(() => {
+  const hash = window.location.hash;
+  if (hash.startsWith('#token=')) {
+    const token = hash.substring('#token='.length);
+    if (token) {
+      console.log('AuthCallback: Token received');
+      // TODO: Implement this method in the auth store
+      // It should store the token, update state, maybe fetch profile, then redirect
+      authStore.handleTokenCallback(token)
+        .then(() => {
+          console.log('AuthCallback: Redirecting to Home');
+          router.push({ name: 'Home' });
+        })
+        .catch(error => {
+          console.error('AuthCallback: Error handling token:', error);
+          // Redirect to home even on error, or maybe a specific error page/login
+          router.push({ name: 'Home' });
+        });
+    } else {
+      console.error('AuthCallback: Token fragment found but token is empty.');
+      router.push({ name: 'Home' }); // Redirect if token is empty
+    }
+  } else {
+    console.error('AuthCallback: No token fragment found in URL hash.');
+    router.push({ name: 'Home' }); // Redirect if no token
+  }
+});
+</script>
+```
+
+## Implementation Flow Diagram
+
+```mermaid
+graph TD
+    subgraph Frontend Changes
+        A[SocialLogins.vue] -- calls --> B(api.ts: getGoogleLoginUrl);
+        B -- returns --> C{Full Backend URL\nhttp://.../auth/google/login};
+        A -- window.location.href --> D[Browser Navigates to Backend];
+
+        E[api.ts: Interceptor] -- detects 401 --> F[Clear Token];
+        F -- window.location.href --> G[Redirect to /];
+
+        H[router/index.ts] -- defines --> I(Catch-all Route :pathMatch);
+        I -- redirects to --> G;
+
+        J[router/index.ts] -- Navigation Guard --> K{Requires Auth?};
+        K -- Yes & Not Authenticated --> G;
+
+        L[Backend Redirects After OAuth] -- to --> M(FE: /auth/callback#token=...);
+        N[AuthCallback.vue] -- reads --> O(window.location.hash);
+        N -- extracts --> P[Token];
+        N -- calls --> Q(authStore.handleTokenCallback);
+        Q -- stores --> R[localStorage];
+        Q -- router.push --> G;
+    end
+
+    D --> Backend;
+    Backend --> L;
+
+    style G fill:#f9f,stroke:#333,stroke-width:2px

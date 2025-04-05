@@ -1,177 +1,153 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
-import * as api from '@/services/api'; // Import API service functions
-import { AxiosError } from 'axios'; // Import AxiosError for type checking
+// Import API functions and types
+import { loginUser, getUserProfile, type LoginCredentials, type UserProfile } from '@/services/api'; // Use @ alias for cleaner imports
 
-// Define the structure for the user profile state
-// Align this with the UserProfile interface in api.ts
-interface UserState {
-  id: number | null;
-  username: string | null;
-  email: string | null;
-  name?: string | null;
-  role: string | null;
-  // Add other relevant fields from UserProfile if needed
-}
+// User interface is now imported as UserProfile
 
-// Define the structure for the auth state
+// Define the state structure
 interface AuthState {
+  isAuthenticated: boolean;
+  user: UserProfile | null; // Use the imported UserProfile type
   token: string | null;
-  user: UserState | null;
-  status: 'idle' | 'loading' | 'success' | 'error'; // For tracking async operations
+  loading: boolean;
+  error: string | null;
 }
 
-export const useAuthStore = defineStore('auth', () => {
-  // --- State ---
-  const token = ref<string | null>(localStorage.getItem('authToken') || null);
-  const user = ref<UserState | null>(null); // User profile info
-  const status = ref<AuthState['status']>('idle'); // Track loading/error states
+// Define the store
+export const useAuthStore = defineStore('auth', {
+  state: (): AuthState => ({
+    isAuthenticated: !!localStorage.getItem('authToken'), // Initialize based on stored token
+    user: null,
+    token: localStorage.getItem('authToken'), // Load token from localStorage
+    loading: false,
+    error: null,
+  }),
 
-  // --- Getters (Computed Properties) ---
-  const isAuthenticated = computed<boolean>(() => !!token.value);
-  const isLoading = computed<boolean>(() => status.value === 'loading');
-  const authUser = computed<UserState | null>(() => user.value);
-
-  // --- Actions ---
-
-  /**
-   * Sets the authentication token and stores it.
-   * @param newToken The JWT token string.
-   */
-  function setToken(newToken: string | null) {
-    token.value = newToken;
-    if (newToken) {
-      localStorage.setItem('authToken', newToken);
-    } else {
-      localStorage.removeItem('authToken');
+  getters: {
+    // Example getter: Check if user is authenticated
+    isLoggedIn(): boolean {
+      return this.isAuthenticated && !!this.token;
+    },
+    // Example getter: Get user profile
+    getUserProfile(): UserProfile | null { // Update return type
+        return this.user;
+    },
+    // Example getter: Get loading state
+    isLoading(): boolean {
+        return this.loading;
+    },
+    // Example getter: Get error message
+    getError(): string | null {
+        return this.error;
     }
-  }
+  },
 
-  /**
-   * Clears authentication state (token and user).
-   */
-  function clearAuth() {
-    setToken(null);
-    user.value = null;
-    status.value = 'idle';
-  }
+  actions: {
+    // Action to handle user login
+    // Action to handle user login using the api service
+    async login(credentials: LoginCredentials) { // Use imported LoginCredentials type
+      this.loading = true;
+      this.error = null;
+      try {
+        // Call the loginUser function from api.ts
+        const loginResponse = await loginUser(credentials);
+        const token = loginResponse.token;
 
-  /**
-   * Attempts to log in the user with credentials.
-   * @param credentials User's email and password.
-   */
-  async function login(credentials: { email: string; password: string }): Promise<void> {
-    status.value = 'loading';
-    try {
-      // Pass credentials as a single object argument
-      const response = await api.loginUser({ email: credentials.email, password: credentials.password });
-      setToken(response.token);
-      await fetchProfile(); // Fetch profile after successful login
-      status.value = 'success';
-    } catch (error: unknown) { // Explicitly type error as unknown
-      console.error('Login failed:', error);
-      clearAuth(); // Clear any partial state on failure
-      status.value = 'error';
-      throw error; // Re-throw error to be handled by the component
-    }
-  }
+        // Store the token
+        this.token = token;
+        localStorage.setItem('authToken', token); // Store token securely
+        this.isAuthenticated = true; // Mark as authenticated
 
-  /**
-   * Registers a new user.
-   * @param userData User registration data.
-   */
-  async function register(userData: { username: string; email: string; password: string }): Promise<void> {
-    status.value = 'loading';
-    try {
-      // Assuming registration directly returns the user profile (adjust if it returns something else)
-      const registeredUser = await api.registerUser(userData);
-      // Optionally log the user in immediately after registration
-      // await login({ email: userData.email, password: userData.password });
-      status.value = 'success'; // Or 'idle' if not logging in automatically
-      // Note: Registration might not return a token directly.
-      // The user might need to log in separately after registering.
-    } catch (error) {
-      console.error('Registration failed:', error);
-      // No need to check error type here unless we need specific handling
-      status.value = 'error';
-      throw error; // Re-throw error
-    }
-  }
+        // After successful login and token storage, fetch the user profile
+        await this.fetchUserProfile(); // Fetch profile using the new token
 
-  /**
-   * Logs out the current user.
-   */
-  function logout(): void {
-    clearAuth();
-    // Optionally redirect to login page or home page via router
-    // import router from '@/router'; // Be careful with imports inside store actions
-    // router.push('/login');
-    console.log('User logged out.');
-  }
+        // If fetchUserProfile fails, the error state will be set there.
+        // If fetchUserProfile succeeds, this.user will be populated.
 
-  /**
-   * Fetches the current user's profile from the backend.
-   */
-  async function fetchProfile(): Promise<void> {
-    if (!token.value) {
-      console.warn('Cannot fetch profile without a token.');
-      return;
-    }
-    status.value = 'loading';
-    try {
-      const profileData = await api.getUserProfile();
-      user.value = { // Map backend response to UserState
-        id: profileData.id,
-        username: profileData.username,
-        email: profileData.email,
-        name: profileData.name,
-        role: profileData.role,
-      };
-      status.value = 'success';
-    } catch (error: unknown) { // Explicitly type error as unknown
-      console.error('Failed to fetch user profile:', error);
-      // If profile fetch fails (e.g., token expired), clear auth state
-      // Check if it's an AxiosError before accessing response
-      if (error instanceof AxiosError && error.response && error.response.status === 401) {
-          clearAuth();
+      } catch (err: any) {
+        // Error handling delegated to api.ts interceptor for 401,
+        // but catch other potential errors (network, validation, etc.)
+        this.error = err.response?.data?.message || err.message || 'Login failed';
+        this.isAuthenticated = false;
+        this.user = null;
+        this.token = null;
+        localStorage.removeItem('authToken');
+      } finally {
+        this.loading = false;
       }
-      status.value = 'error';
-      // Don't re-throw here unless necessary, as it might break initial load checks
-    }
-  }
+    },
 
-  /**
-   * Initializes the store, typically on app load.
-   * Checks for an existing token and fetches the user profile if found.
-   */
-  async function initializeAuth(): Promise<void> {
-      if (token.value && !user.value) { // Only fetch if token exists but user data is missing
-          console.log('Initializing auth: Found token, fetching profile...');
-          await fetchProfile();
-      } else if (!token.value) {
-          console.log('Initializing auth: No token found.');
-          status.value = 'idle';
-      } else {
-          console.log('Initializing auth: User data already present.');
-          status.value = 'success'; // Assume success if user data exists
+    // Action to fetch user profile (e.g., after initial login or page load)
+    // Action to fetch user profile using the api service
+    async fetchUserProfile() {
+      // Token check is useful to prevent unnecessary API calls
+      if (!this.token) {
+        // This case might happen if initializeAuth is called before a token is set (e.g., first visit)
+        // Or if the token was cleared due to an error elsewhere.
+        // console.warn('Attempted to fetch profile without a token.');
+        // No need to set an error here unless it's unexpected.
+        // Ensure state is clean if no token exists.
+        this.isAuthenticated = false;
+        this.user = null;
+        return;
       }
-  }
 
+      this.loading = true;
+      this.error = null;
+      try {
+        // Call the getUserProfile function from api.ts
+        // Auth header is handled by the interceptor in api.ts
+        const userProfile = await getUserProfile();
+        this.user = userProfile;
+        this.isAuthenticated = true; // Re-affirm authentication status
+      } catch (err: any) {
+        // The api.ts interceptor handles 401 by clearing the token and redirecting.
+        // The store's state needs to be updated accordingly.
+        // The interceptor might have already called logout logic indirectly (via page reload).
+        // We still catch other errors (e.g., network, server errors 5xx).
+        this.error = err.response?.data?.message || err.message || 'Failed to fetch user profile';
+        // If an error occurs fetching the profile, assume authentication is compromised
+        this.logout(); // Clean up store state on profile fetch failure
+      } finally {
+        this.loading = false;
+      }
+    },
 
-  // --- Return state, getters, and actions ---
-  return {
-    token,
-    user,
-    status,
-    isAuthenticated,
-    isLoading,
-    authUser,
-    login,
-    register,
-    logout,
-    fetchProfile,
-    setToken, // Expose if needed externally (e.g., for OAuth callback)
-    initializeAuth,
-    clearAuth,
-  };
+    // Action to handle user logout
+    logout() {
+      this.isAuthenticated = false;
+      this.user = null;
+      this.token = null;
+      this.error = null;
+      localStorage.removeItem('authToken'); // Remove token from storage
+      // Optionally redirect to login page or perform other cleanup
+      // Example: router.push('/login');
+    },
+
+    // Action to initialize the store, e.g., on app startup
+    async initializeAuth() {
+        if (this.token && !this.user) {
+            // If token exists but user profile is not loaded, fetch it
+            await this.fetchUserProfile();
+        }
+        // TODO: Implement token refresh logic if needed
+        // Check token expiry, refresh if necessary using a refresh token
+    },
+
+    // Action to handle authentication callback (e.g., for OAuth)
+    // Action to handle authentication callback (e.g., for OAuth)
+    async handleAuthCallback(token: string) { // Make async to await fetchUserProfile
+        this.token = token;
+        this.isAuthenticated = true; // Assume authenticated for now
+        localStorage.setItem('authToken', token);
+        // Fetch user profile immediately after obtaining token
+        await this.fetchUserProfile(); // Await the profile fetch
+        // If fetchUserProfile fails, it will handle logout/error state.
+    },
+
+    // Action to clear errors
+    clearError() {
+        this.error = null;
+    }
+  },
 });
