@@ -7,14 +7,14 @@
         <Field id="email-address" name="email" type="email" autocomplete="email"
                class="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-amber-500 focus:border-amber-500 focus:z-10 sm:text-sm"
                placeholder="you@example.com" />
-        <ErrorMessage name="email" class="absolute text-xs text-red-600 -bottom-4 left-0" />
+        <ErrorMessage name="email" class="absolute text-[0.2rem] font-roboto-condensed text-red-600 -bottom-4 left-0" />
       </div>
       <div class="relative">
         <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
         <Field id="password" name="password" type="password" autocomplete="current-password"
                class="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-amber-500 focus:border-amber-500 focus:z-10 sm:text-sm"
                placeholder="Password" />
-        <ErrorMessage name="password" class="absolute text-xs text-red-600 -bottom-4 left-0" />
+        <ErrorMessage name="password" class="absolute text-[0.2rem] font-roboto-condensed text-red-600 -bottom-4 left-0" />
       </div>
     </div>
 

@@ -62,7 +62,7 @@ func New() *Config {
 			SSLMode:  getEnv("DB_SSL_MODE", "disable"),
 		},
 		JWT: JWTConfig{
-			Secret:    getEnv("JWT_SECRET", "your_secret_key"), // Ensure this is set securely in env
+			Secret:    getEnv("JWT_SECRET", ""), // Ensure this is set securely in env
 			ExpiresIn: getEnvAsInt("JWT_EXPIRES_IN", 24*60*60), // Default: 24 hours in seconds
 		},
 		Google: OAuthConfig{
