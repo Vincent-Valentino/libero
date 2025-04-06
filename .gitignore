@@ -1,77 +1,83 @@
-# --- General ---
-# OS-generated files
-.DS_Store
-Thumbs.db
-ehthumbs.db
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+yarn.lock
+package-lock.json
 
-# Log files
+# Testing
+/coverage
+.nyc_output
+
+# Production
+/build
+/dist
+/out
+/.next/
+/storybook-static
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# Logs
+logs
 *.log
 npm-debug.log*
+yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
 
-# Temporary files
-*~
-*.swp
-*.swo
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 
-# IDE / Editor directories
-.vscode/
-.idea/
-*.iml
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# --- Environment Variables ---
-# Never commit your environment variables!
-# Use .env.example files to show required variables.
-.env
-.env.*
-!.env.example # Allows tracking of an example file
+# Backend specific
+/server/uploads/*
+!/server/uploads/.gitkeep
+*.sqlite
+*.sqlite3
+*.db
 
-# --- Python / FastAPI Microservice (assuming it's in 'libero-ml/') ---
-# Virtual environments
-/libero-ml/venv/
-/libero-ml/.venv/
-/libero-ml/env/
-/libero-ml/ENV/
-/libero-ml/virtualenv/
-/libero-ml/pyenv/
+# Frontend specific
+# dependencies
+/.sass-cache
+/connect.lock
+/libpeerconnection.log
+npm-debug.log
+testem.log
+/typings
+/public/hot
 
-# Python cache files (can apply globally too)
-__pycache__/
-*.py[cod]
+# Cache
+.cache/
+.parcel-cache/
+.eslintcache
+.npm
 
-# Distribution / packaging
-/libero-ml/dist/
-/libero-ml/build/
-/libero-ml/*.egg-info/
-/libero-ml/.eggs/
-/libero-ml/downloads/
-/libero-ml/htmlcov/ # Coverage reports
-/libero-ml/.pytest_cache/
-
-# --- Node.js / Vue Frontend (assuming it's in 'libero-frontend/') ---
-# Node modules
-/libero-frontend/node_modules/
-
-# Build output
-/libero-frontend/dist/
-/libero-frontend/.output/ # Nuxt build output
-/libero-frontend/.nuxt/   # Nuxt temp files
-
-# Lock files (often committed, but can be ignored if desired - check team policy)
-# /libero-frontend/package-lock.json
-# /libero-frontend/yarn.lock
-# /libero-frontend/pnpm-lock.yaml
-
-# Yarn PnP files
-/libero-frontend/.pnp.*
-
-# --- Go Backend (assuming it's in 'libero-backend/') ---
-# Compiled executables (replace 'your_binary_name' if applicable)
-# /libero-backend/your_binary_name
-# /libero-backend/your_binary_name.exe
-
-# Dependencies (if using vendoring and don't want to commit)
-# /libero-backend/vendor/
-
-# Note: .env files are ignored globally by the rule in the "Environment Variables" section.
+# Misc
+*.tsbuildinfo
+.vercel
+.netlify
