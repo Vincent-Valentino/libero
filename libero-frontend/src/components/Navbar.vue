@@ -20,7 +20,9 @@
         <router-link to="/awards" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Awards</router-link>
       </div>
 
-      <button class="hidden md:block ml-auto bg-black rounded-md text-white text-sm font-medium tracking-wide px-4 py-1.5 cursor-pointer hover:bg-gray-800 transition-colors">SIGN IN</button>
+      <!-- Conditional Sign In / Logout Button (Desktop) -->
+      <router-link v-if="!authStore.isAuthenticated" to="/auth" class="hidden md:block ml-auto bg-black rounded-md text-white text-sm font-medium tracking-wide px-4 py-1.5 cursor-pointer hover:bg-gray-800 transition-colors">SIGN IN</router-link>
+      <button v-else @click="handleLogout" class="hidden md:block ml-auto bg-red-600 rounded-md text-white text-sm font-medium tracking-wide px-4 py-1.5 cursor-pointer hover:bg-red-700 transition-colors">LOG OUT</button>
 
       <!-- Mobile Menu Button -->
       <button
@@ -70,7 +72,9 @@
           <router-link @click="closeMenu" to="/team" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">Team</router-link>
           <router-link @click="closeMenu" to="/nations" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">Nations</router-link>
           <router-link @click="closeMenu" to="/awards" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">Awards</router-link>
-          <button class="mt-4 w-full bg-black rounded-md text-white text-xs font-medium tracking-wide px-4 py-1.5 cursor-pointer hover:bg-gray-800 transition-colors">SIGN IN</button>
+          <!-- Conditional Sign In / Logout Button (Mobile) -->
+          <router-link v-if="!authStore.isAuthenticated" @click="closeMenu" to="/auth" class="mt-4 w-full text-center bg-black rounded-md text-white text-xs font-medium tracking-wide px-4 py-1.5 cursor-pointer hover:bg-gray-800 transition-colors">SIGN IN</router-link>
+          <button v-else @click="handleLogout" class="mt-4 w-full bg-red-600 rounded-md text-white text-xs font-medium tracking-wide px-4 py-1.5 cursor-pointer hover:bg-red-700 transition-colors">LOG OUT</button>
         </div>
       </aside> <!-- Closing aside -->
     </Transition>
@@ -79,10 +83,13 @@
 
 <script setup lang="ts">
 import { ref, watch, onUnmounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router'; // Import useRouter
+import { useAuthStore } from '@/stores/auth'; // Import auth store
 
 const isMenuOpen = ref(false);
 const route = useRoute();
+const router = useRouter(); // Get router instance
+const authStore = useAuthStore(); // Get auth store instance
 
 const toggleMenu = () => {
   isMenuOpen.value = !isMenuOpen.value;
@@ -120,6 +127,13 @@ if (typeof window !== 'undefined') {
     setBodyScroll(false);
   });
 }
+
+// Logout Handler
+const handleLogout = () => {
+  authStore.logout(); // Call store action to clear auth state/token
+  closeMenu(); // Close mobile menu if open
+  router.push({ name: 'Home' }); // Redirect to home page
+};
 </script>
 
 <style scoped>

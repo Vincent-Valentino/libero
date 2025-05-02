@@ -1,13 +1,13 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'; // Use type-only import
 import Home from '../home/Home.vue';
 
 // --- Auth Components ---
 // Import the Auth component
 import Auth from '../auth/Auth.vue';
 // Placeholder for OAuth callback handler
-const AuthCallback = { template: '<div>Processing login...</div>' };
-// Placeholder for protected user profile page
-const UserProfile = { template: '<div>User Profile Page (Protected)</div>' };
+const AuthCallback = () => import('../auth/AuthCallback.vue'); // Use dynamic import
+// Import the actual ProfilePage component
+import ProfilePage from '../profile/ProfilePage.vue'; // <-- Import ProfilePage
 
 // Import the LeaguePage component
 import LeaguePage from '../leagues/LeaguePage.vue';
@@ -28,16 +28,16 @@ const Awards = { template: '<div>Awards Page</div>' };
 import { useAuthStore } from '@/stores/auth';
 
 
-const routes = [
+const routes: Array<RouteRecordRaw> = [ // Added type annotation
   { path: '/', name: 'Home', component: Home },
   // Auth routes (public)
   { path: '/auth', name: 'Auth', component: Auth, meta: { guestOnly: true } }, // Redirect if logged in
   { path: '/auth/callback', name: 'AuthCallback', component: AuthCallback }, // Handles OAuth redirect
   // Protected routes
-  { path: '/profile', name: 'Profile', component: UserProfile, meta: { requiresAuth: true } },
+  { path: '/profile', name: 'Profile', component: ProfilePage, meta: { requiresAuth: true } }, // <-- Use ProfilePage
 
   // Existing routes (assuming public for now, add meta: { requiresAuth: true } if needed)
-  // Use LeaguePage for the top 5 leagues
+  // Use LeaguePage for the top 5 leaguesx`
   { path: '/premier-league', name: 'PremierLeague', component: LeaguePage },
   { path: '/la-liga', name: 'LaLiga', component: LeaguePage },
   { path: '/serie-a', name: 'SerieA', component: LeaguePage },
@@ -52,13 +52,22 @@ const routes = [
   { path: '/awards', name: 'Awards', component: Awards },
 ];
 
+// Catch-all route for 404 errors - MUST BE LAST
+const catchAllRoute: RouteRecordRaw = {
+  path: '/:pathMatch(.*)*', // Matches any path not matched above
+  name: 'NotFound',
+  redirect: { name: 'Home' } // Redirect to the root page
+};
+
+routes.push(catchAllRoute); // Add the catch-all route to the array
+
 const router = createRouter({
   history: createWebHistory(),
   routes,
 });
 
 // Navigation Guard
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _, next) => {
   const authStore = useAuthStore(); // Get store instance
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
   const guestOnly = to.matched.some(record => record.meta.guestOnly);
@@ -72,8 +81,8 @@ router.beforeEach((to, from, next) => {
 
   if (requiresAuth && !isAuthenticated) {
     // Redirect to login page if trying to access protected route without auth
-    console.log(`Navigation Guard: Route ${to.path} requires auth. Redirecting to /auth.`);
-    next({ name: 'Auth' });
+    console.log(`Navigation Guard: Route ${to.path} requires auth. Redirecting to /.`);
+    next({ name: 'Home' }); // <--- Changed from 'Auth'
   } else if (guestOnly && isAuthenticated) {
     // Redirect to home/profile if trying to access login/register page while authenticated
     console.log(`Navigation Guard: Route ${to.path} is guest only. Redirecting to /.`);
