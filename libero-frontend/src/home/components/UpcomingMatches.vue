@@ -3,72 +3,43 @@
     <div class="flex flex-col gap-2">
       <h1 class="text-4xl font-title mb-4">Upcoming Matches</h1>
       
+      <!-- League Tabs -->
       <LeagueTabs @tab-change="handleTabChange" />
-      
-      <!-- All Leagues View - Horizontal League Kanban -->
-      <div v-if="selectedTab === 'all'" class="flex justify-start overflow-x-auto">
+      <!-- Loading / Error / Empty -->
+      <div v-if="isLoading" class="text-center py-10">Loading fixtures…</div>
+      <div v-else-if="error" class="text-center py-10 text-red-500">Error: {{ error }}</div>
+      <div v-else-if="displayLeagues.length === 0" class="text-center py-10 text-gray-500">No matches scheduled</div>
+      <!-- Dynamic Sections: All or specific league buckets -->
+      <div v-else-if="displayLeagues.length > 0" class="flex justify-start overflow-x-auto">
         <div class="flex gap-2 max-w-full">
-          <!-- League Columns - Each with independent height -->
-          <div v-for="league in leagueColumns" :key="league.id" class="w-56 flex-shrink-0 self-start">
+          <div
+            v-for="section in displayLeagues"
+            :key="section.competition_name"
+            class="w-56 flex-shrink-0 self-start"
+          >
             <LeagueSection 
-              :leagueName="league.name" 
-              :leagueLogoPath="league.logo">
-              
-              <div class="space-y-2">
-                <div class="flex flex-col">
-                  <MatchCard v-for="(match, index) in league.matches" 
-                    :key="index"
-                    :class="{ 'mt-2': index > 0 }"
-                    :homeTeam="match.homeTeam" 
-                    :awayTeam="match.awayTeam" 
-                    :matchStarted="match.matchStarted" 
-                    :matchDate="match.matchDate" 
-                    :matchStatus="match.matchStatus" 
-                    :stadium="match.stadium"
-                  />
-                  
-                  <!-- Empty state if no matches -->
-                  <div v-if="league.matches.length === 0" class="text-center py-3 text-gray-500 text-xs">
-                    No matches scheduled
-                  </div>
-                </div>
+              :leagueName="section.competition_name"
+              :leagueLogoPath="section.logo_url"
+            >
+              <!-- Empty state per section -->
+              <div v-if="section.matches.length === 0" class="text-gray-500 italic p-4">
+                No matches scheduled for {{ section.competition_name }}
+              </div>
+              <!-- Match list -->
+              <div v-else class="space-y-2">
+                <MatchCard
+                  v-for="(match, idx) in section.matches"
+                  :key="idx"
+                  :class="{ 'mt-2': idx > 0 }"
+                  :homeTeam="{ name: match.home_team_name, logo: isAllTab ? (match.home_logo_url || '') : '', score: match.home_score, acronym: '', colorClass: '' }"
+                  :awayTeam="{ name: match.away_team_name, logo: isAllTab ? (match.away_logo_url || '') : '', score: match.away_score, acronym: '', colorClass: '' }"
+                  :matchStarted="match.home_score != null && match.away_score != null"
+                  :matchDate="formatTime(match.match_date)"
+                  :matchStatus="''"
+                  :stadium="match.venue || ''"
+                />
               </div>
             </LeagueSection>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Specific League View - Date-based Kanban -->
-      <div v-else class="flex justify-start overflow-x-auto">
-        <div class="flex gap-2 max-w-full">
-          <!-- Date Columns - Each with independent height -->
-          <div v-for="column in dateColumns" :key="column.id" class="w-56 flex-shrink-0 self-start">
-            <div class="bg-neutral-100 rounded-2xl p-2">
-              <div class="flex items-center mb-1.5">
-                <h2 class="font-bold text-xs">{{ column.name }}</h2>
-              </div>
-              
-              <div class="flex flex-col">
-                <!-- Display matches for this date column and selected league -->
-                <template v-for="(match, index) in getMatchesForColumn(column.id)" :key="index">
-                  <MatchCard 
-                    :class="{ 'mt-2': index > 0 }"
-                    :homeTeam="match.homeTeam" 
-                    :awayTeam="match.awayTeam" 
-                    :matchStarted="match.matchStarted" 
-                    :matchDate="match.matchDate" 
-                    :matchStatus="match.matchStatus" 
-                    :stadium="match.stadium"
-                  />
-                </template>
-                
-                <!-- Empty state if no matches for this date column -->
-                <div v-if="getMatchesForColumn(column.id).length === 0" 
-                     class="text-center py-3 text-gray-500 text-xs">
-                  No matches scheduled
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -77,467 +48,94 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import LeagueTabs from './LeagueTabs.vue';
 import LeagueSection from './LeagueSection.vue';
 import MatchCard from './MatchCard.vue';
+import { getTodaysFixtures, getFixturesSummary } from '@/services/api';
+import type { FixturesSummaryDTO } from '@/services/api';
 
-// Define types for league IDs and date columns
-type LeagueId = 'premier-league' | 'laliga' | 'serie-a' | 'bundesliga' | 'ligue-1' | 'all';
-type DateColumnId = 'today' | 'tomorrow' | 'upcoming';
+// Track the selected league tab
+const selectedTab = ref<string>('all');
 
-// Track the selected tab
-const selectedTab = ref<LeagueId>('all');
+// Track if 'All Leagues' tab is active
+const isAllTab = computed(() => selectedTab.value === 'all');
+
+// Summary data for a specific league
+const summary = ref<FixturesSummaryDTO | null>(null);
+const allLeagues = ref<any[]>([]);
+const isLoading = ref(false);
+const error = ref<string | null>(null);
+
+// Time formatting helper for WIB
+function formatTime(isoString: string): string {
+  const date = new Date(isoString);
+  return date.toLocaleTimeString('en-GB', {
+    hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Jakarta'
+  }) + ' WIB';
+}
 
 // Handle tab change from LeagueTabs component
-const handleTabChange = (tabId: string) => {
-  selectedTab.value = tabId as LeagueId;
-};
+function handleTabChange(tabId: string) {
+  selectedTab.value = tabId;
+}
 
-// Date columns for specific league view
-const dateColumns = [
-  { id: 'today', name: 'Today' },
-  { id: 'tomorrow', name: 'Tomorrow' },
-  { id: 'upcoming', name: 'Upcoming' }
-];
-
-// League columns configuration
-const leagueColumns = [
-  { 
-    id: 'premier-league' as LeagueId, 
-    name: 'Premier League', 
-    logo: '/Premier League.svg',
-    matches: [
-      {
-        homeTeam: { 
-          name: 'Arsenal', 
-          acronym: 'ARS', 
-          colorClass: 'bg-gray-100',
-          score: 2,
-          logo: 'https://resources.premierleague.com/premierleague/badges/t3.svg'
-        },
-        awayTeam: { 
-          name: 'Chelsea', 
-          acronym: 'CHE', 
-          colorClass: 'bg-blue-100',
-          score: 1,
-          logo: 'https://resources.premierleague.com/premierleague/badges/t8.svg'
-        },
-        matchStarted: true,
-        matchStatus: "75'",
-        stadium: "Emirates Stadium"
-      },
-      {
-        homeTeam: { 
-          name: 'Man United', 
-          acronym: 'MUN', 
-          colorClass: 'bg-red-100',
-          logo: 'https://resources.premierleague.com/premierleague/badges/t1.svg'
-        },
-        awayTeam: { 
-          name: 'Liverpool', 
-          acronym: 'LIV', 
-          colorClass: 'bg-red-700',
-          textColorClass: 'text-white',
-          logo: 'https://resources.premierleague.com/premierleague/badges/t14.svg'
-        },
-        matchStarted: false,
-        matchDate: "Today",
-        matchStatus: "20:45",
-        stadium: "Old Trafford"
-      }
-    ]
-  },
-  { 
-    id: 'laliga' as LeagueId, 
-    name: 'La Liga', 
-    logo: '/LaLiga.svg',
-    matches: [
-      {
-        homeTeam: { 
-          name: 'Barcelona', 
-          acronym: 'BAR', 
-          colorClass: 'bg-blue-100',
-          logo: 'https://assets.laliga.com/squad/2023/t178/p82464/32/512x512/p82464_t178_2023_1_003_000.png'
-        },
-        awayTeam: { 
-          name: 'Real Madrid', 
-          acronym: 'RMA', 
-          colorClass: 'bg-gray-100',
-          logo: 'https://assets.laliga.com/squad/2023/t186/p48772/32/512x512/p48772_t186_2023_1_003_000.png'
-        },
-        matchStarted: false,
-        matchDate: "Tomorrow",
-        matchStatus: "18:00",
-        stadium: "Camp Nou"
-      },
-      {
-        homeTeam: { 
-          name: 'Sevilla', 
-          acronym: 'SEV', 
-          colorClass: 'bg-red-200',
-          score: 0,
-          logo: 'https://assets.laliga.com/squad/2023/t179/p49888/32/512x512/p49888_t179_2023_1_003_000.png'
-        },
-        awayTeam: { 
-          name: 'Atletico Madrid', 
-          acronym: 'ATM', 
-          colorClass: 'bg-red-500',
-          textColorClass: 'text-white',
-          score: 0,
-          logo: 'https://assets.laliga.com/squad/2023/t175/p77906/32/512x512/p77906_t175_2023_1_003_000.png'
-        },
-        matchStarted: true,
-        matchStatus: "12'",
-        stadium: "Ramón Sánchez Pizjuán"
-      }
-    ]
-  },
-  { 
-    id: 'serie-a' as LeagueId, 
-    name: 'Serie A', 
-    logo: '/Lega Serie A.svg',
-    matches: [
-      {
-        homeTeam: { 
-          name: 'Juventus', 
-          acronym: 'JUV', 
-          colorClass: 'bg-black',
-          textColorClass: 'text-white',
-          logo: 'https://media.api-sports.io/football/teams/496.png'
-        },
-        awayTeam: { 
-          name: 'Inter', 
-          acronym: 'INT', 
-          colorClass: 'bg-blue-800',
-          textColorClass: 'text-white',
-          logo: 'https://media.api-sports.io/football/teams/505.png'
-        },
-        matchStarted: false,
-        matchDate: "Today",
-        matchStatus: "21:00",
-        stadium: "Allianz Stadium"
-      },
-      {
-        homeTeam: { 
-          name: 'AC Milan', 
-          acronym: 'MIL', 
-          colorClass: 'bg-red-600',
-          textColorClass: 'text-white',
-          score: 3,
-          logo: 'https://media.api-sports.io/football/teams/489.png'
-        },
-        awayTeam: { 
-          name: 'Napoli', 
-          acronym: 'NAP', 
-          colorClass: 'bg-blue-500',
-          textColorClass: 'text-white',
-          score: 1,
-          logo: 'https://media.api-sports.io/football/teams/492.png'
-        },
-        matchStarted: true,
-        matchStatus: "90'+2",
-        stadium: "San Siro"
-      },
-      {
-        homeTeam: { 
-          name: 'AC Milan', 
-          acronym: 'MIL', 
-          colorClass: 'bg-red-600',
-          textColorClass: 'text-white',
-          score: 3,
-          logo: 'https://media.api-sports.io/football/teams/489.png'
-        },
-        awayTeam: { 
-          name: 'Napoli', 
-          acronym: 'NAP', 
-          colorClass: 'bg-blue-500',
-          textColorClass: 'text-white',
-          score: 1,
-          logo: 'https://media.api-sports.io/football/teams/492.png'
-        },
-        matchStarted: true,
-        matchStatus: "90'+2",
-        stadium: "San Siro"
-      },
-      {
-        homeTeam: { 
-          name: 'AC Milan', 
-          acronym: 'MIL', 
-          colorClass: 'bg-red-600',
-          textColorClass: 'text-white',
-          score: 3,
-          logo: 'https://media.api-sports.io/football/teams/489.png'
-        },
-        awayTeam: { 
-          name: 'Napoli', 
-          acronym: 'NAP', 
-          colorClass: 'bg-blue-500',
-          textColorClass: 'text-white',
-          score: 1,
-          logo: 'https://media.api-sports.io/football/teams/492.png'
-        },
-        matchStarted: true,
-        matchStatus: "90'+2",
-        stadium: "San Siro"
-      }
-    ]
-  },
-  { 
-    id: 'bundesliga' as LeagueId, 
-    name: 'Bundesliga', 
-    logo: '/Bundesliga.svg',
-    matches: [
-      {
-        homeTeam: { 
-          name: 'Bayern Munich', 
-          acronym: 'BAY', 
-          colorClass: 'bg-red-500',
-          textColorClass: 'text-white',
-          score: 2,
-          logo: 'https://media.api-sports.io/football/teams/157.png'
-        },
-        awayTeam: { 
-          name: 'Dortmund', 
-          acronym: 'BVB', 
-          colorClass: 'bg-yellow-400',
-          score: 0,
-          logo: 'https://media.api-sports.io/football/teams/165.png'
-        },
-        matchStarted: true,
-        matchStatus: "45'",
-        stadium: "Allianz Arena"
-      },
-      {
-        homeTeam: { 
-          name: 'RB Leipzig', 
-          acronym: 'RBL', 
-          colorClass: 'bg-blue-200',
-          logo: 'https://media.api-sports.io/football/teams/173.png'
-        },
-        awayTeam: { 
-          name: 'Leverkusen', 
-          acronym: 'LEV', 
-          colorClass: 'bg-red-600',
-          textColorClass: 'text-white',
-          logo: 'https://media.api-sports.io/football/teams/168.png'
-        },
-        matchStarted: false,
-        matchDate: "Tomorrow",
-        matchStatus: "16:30",
-        stadium: "Red Bull Arena"
-      }
-    ]
-  },
-  { 
-    id: 'ligue-1' as LeagueId, 
-    name: 'Ligue 1', 
-    logo: '/Ligue 1 Uber Eats.svg',
-    matches: [
-      {
-        homeTeam: { 
-          name: 'PSG', 
-          acronym: 'PSG', 
-          colorClass: 'bg-blue-800',
-          textColorClass: 'text-white',
-          logo: 'https://media.api-sports.io/football/teams/85.png'
-        },
-        awayTeam: { 
-          name: 'Marseille', 
-          acronym: 'MAR', 
-          colorClass: 'bg-blue-500',
-          textColorClass: 'text-white',
-          logo: 'https://media.api-sports.io/football/teams/81.png'
-        },
-        matchStarted: false,
-        matchDate: "Tomorrow",
-        matchStatus: "20:00",
-        stadium: "Parc des Princes"
-      },
-      {
-        homeTeam: { 
-          name: 'Lyon', 
-          acronym: 'LYO', 
-          colorClass: 'bg-red-800',
-          textColorClass: 'text-white',
-          score: 1,
-          logo: 'https://media.api-sports.io/football/teams/80.png'
-        },
-        awayTeam: { 
-          name: 'Monaco', 
-          acronym: 'MON', 
-          colorClass: 'bg-red-500',
-          textColorClass: 'text-white',
-          score: 1,
-          logo: 'https://media.api-sports.io/football/teams/91.png'
-        },
-        matchStarted: true,
-        matchStatus: "60'",
-        stadium: "Groupama Stadium"
-      }
-    ]
+// League codes to prefetch
+const leagueCodes = ['pl','pd','sa','bl1','fl1','cl','el'];
+// Map of competition code to summary
+const summariesMap = ref<Record<string, typeof summary.value>>({});
+// Fetch today's fixtures and all summaries on mount
+onMounted(async () => {
+  isLoading.value = true;
+  try {
+    allLeagues.value = await getTodaysFixtures();
+    const promises = leagueCodes.map(code =>
+      getFixturesSummary(code)
+        .then(data => ({ code, data }))
+        .catch(() => ({ code, data: null }))
+    );
+    const results = await Promise.all(promises);
+    results.forEach(({ code, data }) => {
+      summariesMap.value[code] = data;
+    });
+  } catch (e: any) {
+    error.value = e.message;
+  } finally {
+    isLoading.value = false;
   }
-];
+});
 
-// All matches data organized by league and date
-const allMatches: Record<Exclude<LeagueId, 'all'>, Record<DateColumnId, any[]>> = {
-  'premier-league': {
-    'today': [
-      {
-        homeTeam: { 
-          name: 'Man United', 
-          acronym: 'MUN', 
-          colorClass: 'bg-red-100',
-          logo: 'https://resources.premierleague.com/premierleague/badges/t1.svg'
-        },
-        awayTeam: { 
-          name: 'Liverpool', 
-          acronym: 'LIV', 
-          colorClass: 'bg-red-700',
-          textColorClass: 'text-white',
-          logo: 'https://resources.premierleague.com/premierleague/badges/t14.svg'
-        },
-        matchStarted: false,
-        matchDate: "Today",
-        matchStatus: "20:45",
-        stadium: "Old Trafford"
-      }
-    ],
-    'tomorrow': [],
-    'upcoming': [
-      {
-        homeTeam: { 
-          name: 'Tottenham', 
-          acronym: 'TOT', 
-          colorClass: 'bg-blue-900',
-          textColorClass: 'text-white',
-          logo: 'https://resources.premierleague.com/premierleague/badges/t6.svg'
-        },
-        awayTeam: { 
-          name: 'Man City', 
-          acronym: 'MCI', 
-          colorClass: 'bg-blue-400',
-          logo: 'https://resources.premierleague.com/premierleague/badges/t43.svg'
-        },
-        matchStarted: false,
-        matchDate: "Oct 24",
-        matchStatus: "16:30",
-        stadium: "Tottenham Hotspur Stadium"
-      }
-    ]
-  },
-  'laliga': {
-    'today': [],
-    'tomorrow': [
-      {
-        homeTeam: { 
-          name: 'Barcelona', 
-          acronym: 'BAR', 
-          colorClass: 'bg-blue-100',
-          logo: 'https://assets.laliga.com/squad/2023/t178/p82464/32/512x512/p82464_t178_2023_1_003_000.png'
-        },
-        awayTeam: { 
-          name: 'Real Madrid', 
-          acronym: 'RMA', 
-          colorClass: 'bg-gray-100',
-          logo: 'https://assets.laliga.com/squad/2023/t186/p48772/32/512x512/p48772_t186_2023_1_003_000.png'
-        },
-        matchStarted: false,
-        matchDate: "Tomorrow",
-        matchStatus: "18:00",
-        stadium: "Camp Nou"
-      }
-    ],
-    'upcoming': []
-  },
-  'serie-a': {
-    'today': [
-      {
-        homeTeam: { 
-          name: 'Juventus', 
-          acronym: 'JUV', 
-          colorClass: 'bg-black',
-          textColorClass: 'text-white',
-          logo: 'https://media.api-sports.io/football/teams/496.png'
-        },
-        awayTeam: { 
-          name: 'Inter', 
-          acronym: 'INT', 
-          colorClass: 'bg-blue-800',
-          textColorClass: 'text-white',
-          logo: 'https://media.api-sports.io/football/teams/505.png'
-        },
-        matchStarted: false,
-        matchDate: "Today",
-        matchStatus: "21:00",
-        stadium: "Allianz Stadium"
-      }
-    ],
-    'tomorrow': [],
-    'upcoming': []
-  },
-  'bundesliga': {
-    'today': [],
-    'tomorrow': [
-      {
-        homeTeam: { 
-          name: 'RB Leipzig', 
-          acronym: 'RBL', 
-          colorClass: 'bg-blue-200',
-          logo: 'https://media.api-sports.io/football/teams/173.png'
-        },
-        awayTeam: { 
-          name: 'Leverkusen', 
-          acronym: 'LEV', 
-          colorClass: 'bg-red-600',
-          textColorClass: 'text-white',
-          logo: 'https://media.api-sports.io/football/teams/168.png'
-        },
-        matchStarted: false,
-        matchDate: "Tomorrow",
-        matchStatus: "16:30",
-        stadium: "Red Bull Arena"
-      }
-    ],
-    'upcoming': []
-  },
-  'ligue-1': {
-    'today': [],
-    'tomorrow': [
-      {
-        homeTeam: { 
-          name: 'PSG', 
-          acronym: 'PSG', 
-          colorClass: 'bg-blue-800',
-          textColorClass: 'text-white',
-          logo: 'https://media.api-sports.io/football/teams/85.png'
-        },
-        awayTeam: { 
-          name: 'Marseille', 
-          acronym: 'MAR', 
-          colorClass: 'bg-blue-500',
-          textColorClass: 'text-white',
-          logo: 'https://media.api-sports.io/football/teams/81.png'
-        },
-        matchStarted: false,
-        matchDate: "Tomorrow",
-        matchStatus: "20:00",
-        stadium: "Parc des Princes"
-      }
-    ],
-    'upcoming': []
+// Update summary when tab changes, using prefetched data
+watch(selectedTab, (code) => {
+  if (code !== 'all') {
+    summary.value = summariesMap.value[code] || null;
   }
-};
+});
 
-// Get matches for a specific column and the selected league
-const getMatchesForColumn = (columnId: string) => {
-  if (!selectedTab.value || selectedTab.value === 'all') {
+// Compute sections for display
+const displayLeagues = computed(() => {
+  if (selectedTab.value === 'all') {
+    // Show each league's today's fixtures
+    return allLeagues.value
+      .filter((l: any) => l.matches && l.matches.length > 0)
+      .map((l: any) => ({
+        competition_name: l.competition_name,
+        logo_url: l.logo_url,
+        matches: (l.matches as any[]).slice(0, 4),
+      }));
+  }
+  // Specific league tab: show Today, Tomorrow, Upcoming without team logos
+  const summ = summariesMap.value[selectedTab.value];
+  if (!summ) {
     return [];
   }
-  
-  const league = selectedTab.value as Exclude<LeagueId, 'all'>;
-  return allMatches[league][columnId as DateColumnId] || [];
-};
+  const { today, tomorrow, upcoming } = summ;
+  return [
+    { competition_name: 'Today', logo_url: '', matches: today.slice(0, 4) },
+    { competition_name: 'Tomorrow', logo_url: '', matches: tomorrow.slice(0, 4) },
+    { competition_name: 'Upcoming', logo_url: '', matches: upcoming.slice(0, 4) },
+  ];
+});
 </script>
 
 <style scoped>

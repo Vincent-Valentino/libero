@@ -17,14 +17,83 @@ interface RegisterUserData {
 }
 
 // Define a basic user profile structure (adjust based on backend's UserResponse)
-export interface UserProfile { // Add export keyword
+// Define interfaces for expected data structures from profile_feature_plan.md
+interface Team {
   id: number;
-  username: string;
+  name: string;
+  // Add other fields if needed later
+}
+
+interface Player {
+  id: number;
+  name: string;
+  // Add other fields if needed later
+}
+
+// Add Competition interface
+interface Competition {
+  id: number;
+  name: string;
+  // Add other fields if needed later
+}
+
+interface UserPreferences {
+  followed_teams: Team[];
+  followed_players: Player[];
+  followed_competitions: Competition[]; // Added competitions
+}
+
+// Updated UserProfile interface to include preferences
+export interface UserProfile {
+  id: number;
+  username?: string; // Make username optional if backend doesn't always return it
   email: string;
   name?: string;
-  role: string;
-  created_at: string;
-  updated_at: string;
+  role?: string; // Make role optional
+  created_at?: string; // Make optional
+  updated_at?: string; // Make optional
+  preferences: UserPreferences; // Added preferences
+}
+
+// Interface for the PUT /api/users/preferences payload
+export interface UpdatePreferencesPayload {
+  add_teams?: number[];
+  remove_teams?: number[];
+  add_players?: number[];
+  remove_players?: number[];
+  add_competitions?: number[];    // Added competitions
+  remove_competitions?: number[]; // Added competitions
+}
+
+// --- Fixtures DTOs ---
+
+export interface FixtureMatchDTO {
+  match_date: string;
+  home_team_name: string;
+  away_team_name: string;
+  home_score?: number | null;
+  away_score?: number | null;
+  match_status: string;
+  venue?: string;
+  home_logo_url?: string;
+  away_logo_url?: string;
+}
+
+export interface CompetitionFixturesDTO {
+  competition_name: string;
+  competition_code: string;
+  logo_url?: string;
+  matches: FixtureMatchDTO[];
+}
+
+// --- Fixtures Summary DTO ---
+export interface FixturesSummaryDTO {
+  competition_name: string;
+  competition_code: string;
+  logo_url?: string;
+  today: FixtureMatchDTO[];
+  tomorrow: FixtureMatchDTO[];
+  upcoming: FixtureMatchDTO[];
 }
 
 // Base URL for the backend API
@@ -35,7 +104,7 @@ const API_BASE_URL: string = '/api';
 const BACKEND_BASE_URL: string = 'http://localhost:8080'; // <-- Added
 
 const apiClient: AxiosInstance = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: `${BACKEND_BASE_URL}${API_BASE_URL}`,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -113,6 +182,17 @@ export const getUserProfile = (): Promise<UserProfile> => {
     .then(response => response.data);
 };
 
+/**
+ * Updates the preferences of the currently authenticated user.
+ * @param payload - Object containing arrays of IDs for teams/players to add/remove
+ * @returns Promise<void | UserProfile> - Backend might return updated profile or just 204
+ */
+export const updateUserPreferences = (payload: UpdatePreferencesPayload): Promise<void | UserProfile> => {
+  // Assuming the backend might return the updated profile or just a success status
+  return apiClient.put<void | UserProfile>('/users/preferences', payload)
+    .then(response => response.data); // Return data if available (e.g., updated profile)
+};
+
 // --- OAuth ---
 // We don't call OAuth endpoints directly via JS/TS.
 // Instead, we redirect the browser to the backend OAuth login URLs.
@@ -144,5 +224,26 @@ export const getGitHubLoginUrl = (): string => {
   return `${BACKEND_BASE_URL}/auth/github/login`; // <--- Changed
 };
 
+
+// --- Sports/Fixtures API Calls ---
+
+/**
+ * Fetches today's fixtures for relevant competitions.
+ * @returns Promise containing an array of CompetitionFixturesDTO
+ */
+export const getTodaysFixtures = (): Promise<CompetitionFixturesDTO[]> => {
+  return apiClient.get<CompetitionFixturesDTO[]>('/sports/fixtures/today')
+    .then(response => response.data);
+};
+
+/**
+ * Fetches summary of fixtures (today, tomorrow, upcoming) for a specific competition.
+ * @param competitionCode - competition code (e.g., 'PL', 'CL')
+ * @returns Promise containing the fixtures summary DTO
+ */
+export const getFixturesSummary = (competitionCode: string): Promise<FixturesSummaryDTO> => {
+  return apiClient.get<FixturesSummaryDTO>(`/sports/fixtures/summary?competition=${competitionCode}`)
+    .then(response => response.data);
+};
 
 export default apiClient; // Export the configured instance if needed elsewhere

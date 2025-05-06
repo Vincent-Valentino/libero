@@ -18,6 +18,12 @@ type User struct {
 	Active    bool      `gorm:"default:true" json:"active"`
 	Provider  string    `gorm:"index" json:"-"` // OAuth Provider (e.g., google), indexed
 	ProviderID string   `gorm:"index" json:"-"` // User ID from the OAuth provider, indexed
+
+	// Relationships for Preferences
+	FollowedTeams        []*Team        `gorm:"many2many:user_followed_teams;" json:"followed_teams,omitempty"`
+	FollowedPlayers      []*Player      `gorm:"many2many:user_followed_players;" json:"followed_players,omitempty"`
+	FollowedCompetitions []*Competition `gorm:"many2many:user_followed_competitions;" json:"followed_competitions,omitempty"`
+
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -62,4 +68,51 @@ func (u *User) ToResponse() UserResponse {
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,
 	}
+}
+
+// --- DTOs for Profile Feature ---
+
+// UpdatePreferencesRequest defines the structure for the PUT /api/users/preferences request body.
+type UpdatePreferencesRequest struct {
+	AddTeams    []uint `json:"add_teams"`    // IDs of teams to follow
+	RemoveTeams []uint `json:"remove_teams"` // IDs of teams to unfollow
+	AddPlayers    []uint `json:"add_players"`    // IDs of players to follow
+	RemovePlayers []uint `json:"remove_players"` // IDs of players to unfollow
+	AddCompetitions    []uint `json:"add_competitions"`    // IDs of competitions to follow
+	RemoveCompetitions []uint `json:"remove_competitions"` // IDs of competitions to unfollow
+}
+
+// TeamPreferenceInfo defines the structure for team info within the profile response.
+type TeamPreferenceInfo struct {
+	ID   uint   `json:"id"`
+	Name string `json:"name"`
+}
+
+// PlayerPreferenceInfo defines the structure for player info within the profile response.
+type PlayerPreferenceInfo struct {
+	ID   uint   `json:"id"`
+	Name string `json:"name"`
+	// Add TeamName or TeamID if needed in the future
+}
+
+// CompetitionPreferenceInfo defines the structure for competition info within the profile response.
+type CompetitionPreferenceInfo struct {
+	ID   uint   `json:"id"`
+	Name string `json:"name"`
+	// Add Sport or Region if needed
+}
+
+// UserPreferencesResponse defines the nested structure for preferences in the profile response.
+type UserPreferencesResponse struct {
+	FollowedTeams        []TeamPreferenceInfo        `json:"followed_teams"`
+	FollowedPlayers      []PlayerPreferenceInfo      `json:"followed_players"`
+	FollowedCompetitions []CompetitionPreferenceInfo `json:"followed_competitions"`
+}
+
+// UserProfileResponse defines the structure for the GET /api/users/profile response body.
+type UserProfileResponse struct {
+	ID          uint                  `json:"id"`
+	Name        string                `json:"name"`
+	Email       string                `json:"email"`
+	Preferences UserPreferencesResponse `json:"preferences"`
 }

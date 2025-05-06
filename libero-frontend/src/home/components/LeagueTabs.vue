@@ -22,11 +22,13 @@ const activeTab = ref('all');
 
 const tabs = [
   { id: 'all', name: 'All Leagues', image: null },
-  { id: 'premier-league', name: 'Premier League', image: '/Premier League.svg' },
-  { id: 'laliga', name: 'La Liga', image: '/LaLiga.svg' },
-  { id: 'serie-a', name: 'Serie A', image: '/Lega Serie A.svg' },
-  { id: 'bundesliga', name: 'Bundesliga', image: '/Bundesliga.svg' },
-  { id: 'ligue-1', name: 'Ligue 1', image: '/Ligue 1 Uber Eats.svg' }
+  { id: 'pl',   name: 'Premier League',      image: '/Premier League.svg' },
+  { id: 'pd',   name: 'La Liga',             image: '/LaLiga.svg' },
+  { id: 'sa',   name: 'Serie A',             image: '/Lega Serie A.svg' },
+  { id: 'bl1',  name: 'Bundesliga',          image: '/Bundesliga.svg' },
+  { id: 'fl1',  name: 'Ligue 1',             image: '/Ligue 1 Uber Eats.svg' },
+  { id: 'cl',   name: 'Champions League',    image: '/UCL.svg' },
+  { id: 'el',   name: 'Europa League',       image: '/UEL.svg' }
 ];
 
 const setActiveTab = (tabId: string) => {

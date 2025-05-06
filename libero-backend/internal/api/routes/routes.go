@@ -25,9 +25,15 @@ func SetupRoutes(router *mux.Router, service *service.Service, cfg *config.Confi
 
 	// Public routes (no authentication required)
 	api.HandleFunc("/health", healthCheck).Methods(http.MethodGet)
-	api.HandleFunc("/auth/register", ctrl.User.Register).Methods(http.MethodPost)
- // Changed path prefix
-	api.HandleFunc("/auth/login", ctrl.User.Login).Methods(http.MethodPost) // Changed path prefix
+	api.HandleFunc("/auth/register", ctrl.User.Register).Methods(http.MethodPost) // Changed path prefix
+	api.HandleFunc("/auth/login", ctrl.User.Login).Methods(http.MethodPost)       // Changed path prefix
+
+	// NEW: Public Sports Data routes
+	api.HandleFunc("/matches/upcoming", ctrl.SportsData.HandleGetUpcomingMatches).Methods(http.MethodGet)
+	api.HandleFunc("/matches/results", ctrl.SportsData.HandleGetResults).Methods(http.MethodGet)
+	api.HandleFunc("/players/{player_id}/stats", ctrl.SportsData.HandleGetPlayerStats).Methods(http.MethodGet)
+	api.HandleFunc("/sports/fixtures/today", ctrl.SportsData.HandleGetTodaysFixtures).Methods(http.MethodGet) // Today's fixtures
+	api.HandleFunc("/sports/fixtures/summary", ctrl.SportsData.HandleGetFixturesSummary).Methods(http.MethodGet) // Fixtures summary per competition
 
 	// OAuth routes (public) - Using root router for /auth path
 	auth := router.PathPrefix("/auth").Subrouter()
@@ -42,9 +48,9 @@ func SetupRoutes(router *mux.Router, service *service.Service, cfg *config.Confi
 	protected := api.PathPrefix("").Subrouter()
 	protected.Use(middleware.AuthMiddleware(authService)) // Inject AuthService
 
-	// User routes
-	protected.HandleFunc("/users/profile", ctrl.User.GetProfile).Methods(http.MethodGet)
-	protected.HandleFunc("/users/profile", ctrl.User.UpdateProfile).Methods(http.MethodPut)
+	// User routes (Profile & Preferences)
+	protected.HandleFunc("/users/profile", ctrl.User.GetUserProfile).Methods(http.MethodGet)       // Get profile with preferences
+	protected.HandleFunc("/users/preferences", ctrl.User.UpdateUserPreferences).Methods(http.MethodPut) // Update preferences
 
 	// Admin routes (requires admin role)
 	admin := api.PathPrefix("/admin").Subrouter()

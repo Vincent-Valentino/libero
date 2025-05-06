@@ -92,23 +92,28 @@ func (c *UserController) Login(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, map[string]string{"token": token})
 }
 
-// GetProfile handles requests to get the current user's profile
-func (c *UserController) GetProfile(w http.ResponseWriter, r *http.Request) {
+// GetUserProfile handles requests to get the current user's profile including preferences
+func (c *UserController) GetUserProfile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	// Get user from context (set by the auth middleware)
-	claims, ok := middleware.GetUserFromContext(r.Context())
+	claims, ok := middleware.GetUserFromContext(ctx)
 	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		respondWithJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
 		return
 	}
 
-	// Get user profile
-	user, err := c.service.GetUserByID(claims.UserID)
+	// Get user profile with preferences from service
+	profile, err := c.service.GetUserProfile(ctx, claims.UserID)
 	if err != nil {
-		http.Error(w, "User not found", http.StatusNotFound)
+		// TODO: Add more specific error handling (e.g., check for gorm.ErrRecordNotFound)
+		// For now, assume not found or internal error
+		// Log the actual error server-side
+		// log.Printf("Error fetching user profile for user %d: %v", claims.UserID, err)
+		http.Error(w, "Failed to retrieve user profile", http.StatusNotFound) // Or InternalServerError depending on error type
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, user.ToResponse()) // Use ToResponse
+	respondWithJSON(w, http.StatusOK, profile)
 }
 
 // UpdateProfile handles requests to update the current user's profile
@@ -240,6 +245,37 @@ func (c *UserController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// UpdateUserPreferences handles requests to update the current user's preferences
+func (c *UserController) UpdateUserPreferences(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// Get user from context
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		respondWithJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
+
+	// Parse request body
+	var req models.UpdatePreferencesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request payload"})
+		return
+	}
+
+	// Call the service to update preferences
+	err := c.service.UpdateUserPreferences(ctx, claims.UserID, req)
+	if err != nil {
+		// The service currently logs warnings but returns nil.
+		// If the service were to return errors (e.g., for invalid IDs), handle them here.
+		// log.Printf("Error updating preferences for user %d: %v", claims.UserID, err)
+		respondWithJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update preferences"})
+		return
+	}
+
+	// Respond with No Content on success
 	w.WriteHeader(http.StatusNoContent)
 }
 

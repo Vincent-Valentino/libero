@@ -80,9 +80,7 @@ const handleSocialLogin = (provider: 'google' | 'facebook' | 'github') => {
   // Redirect the browser to the backend OAuth endpoint
   // The backend will handle the redirect to the actual provider
   // Alternative method: Create and click a link
-  const link = document.createElement('a');
-  link.href = redirectUrl;
-  link.click();
-  // window.location.href = redirectUrl; // Original method
+  window.location.href = redirectUrl;
 };
+
 </script>

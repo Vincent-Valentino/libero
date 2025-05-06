@@ -6,8 +6,6 @@ import Home from '../home/Home.vue';
 import Auth from '../auth/Auth.vue';
 // Placeholder for OAuth callback handler
 const AuthCallback = () => import('../auth/AuthCallback.vue'); // Use dynamic import
-// Import the actual ProfilePage component
-import ProfilePage from '../profile/ProfilePage.vue'; // <-- Import ProfilePage
 
 // Import the LeaguePage component
 import LeaguePage from '../leagues/LeaguePage.vue';
@@ -34,8 +32,6 @@ const routes: Array<RouteRecordRaw> = [ // Added type annotation
   { path: '/auth', name: 'Auth', component: Auth, meta: { guestOnly: true } }, // Redirect if logged in
   { path: '/auth/callback', name: 'AuthCallback', component: AuthCallback }, // Handles OAuth redirect
   // Protected routes
-  { path: '/profile', name: 'Profile', component: ProfilePage, meta: { requiresAuth: true } }, // <-- Use ProfilePage
-
   // Existing routes (assuming public for now, add meta: { requiresAuth: true } if needed)
   // Use LeaguePage for the top 5 leaguesx`
   { path: '/premier-league', name: 'PremierLeague', component: LeaguePage },
@@ -50,6 +46,13 @@ const routes: Array<RouteRecordRaw> = [ // Added type annotation
   { path: '/team', name: 'Team', component: Team },
   { path: '/nations', name: 'Nations', component: Nations },
   { path: '/awards', name: 'Awards', component: Awards },
+  // Profile route (protected)
+  {
+    path: '/profile',
+    name: 'profile',
+    component: () => import('@/profile/ProfilePage.vue'), // Lazy load
+    meta: { requiresAuth: true } // Ensure user is logged in
+  },
 ];
 
 // Catch-all route for 404 errors - MUST BE LAST

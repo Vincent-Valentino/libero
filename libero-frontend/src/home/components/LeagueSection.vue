@@ -1,7 +1,7 @@
 <template>
   <div class="bg-neutral-100 rounded-2xl p-3 pb-5 h-auto" :class="{ 'col-span-2': fullWidth }">
     <div class="flex items-center mb-1.5">
-      <img :src="leagueLogoPath" :alt="leagueName" class="w-4 h-4 mr-1.5" />
+      <img v-if="leagueLogoPath" :src="leagueLogoPath" :alt="leagueName" class="w-4 h-4 mr-1.5" />
       <h2 class="font-bold text-xs">{{ leagueName }}</h2>
     </div>
     

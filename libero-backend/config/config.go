@@ -15,6 +15,9 @@ type Config struct {
 	Facebook    OAuthConfig
 	GitHub      OAuthConfig
 	FrontendURL string // Added Frontend URL
+	MLServiceURL string // Added ML Service URL
+	ThirdPartyAPIKey   string // API key for the football data provider
+	ThirdPartyBaseURL  string // Base URL for the football data provider
 }
 
 // ServerConfig holds server-specific configuration
@@ -81,6 +84,9 @@ func New() *Config {
 			RedirectURL:  getEnv("GITHUB_REDIRECT_URL", "http://localhost:8080/auth/github/callback"),
 		},
 		FrontendURL: getEnv("FRONTEND_URL", "http://localhost:5173"), // Added Frontend URL loading (default Vite port)
+		MLServiceURL: getEnv("ML_SERVICE_URL", "http://localhost:8001"), // Added ML Service URL loading
+		ThirdPartyAPIKey:  getEnv("THIRD_PARTY_FOOTBALL_API_KEY", ""),
+		ThirdPartyBaseURL: getEnv("THIRD_PARTY_BASE_URL", "https://api.football-data.org/v2"),
 	}
 }
 

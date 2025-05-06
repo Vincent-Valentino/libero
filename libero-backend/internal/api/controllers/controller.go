@@ -7,15 +7,17 @@ import (
 
 // Service provides access to all service operations
 type Controller struct {
-	User *UserController
-	Oauth *OAuthController
+	User       *UserController
+	Oauth      *OAuthController
+	SportsData *SportsDataController // Added SportsDataController field
 }
 
 // New creates a new service instance with all services
 func New(service *service.Service, cfg *config.Config) *Controller { // Added cfg argument
 
 	return &Controller{
-		User: NewUserController(service.User, service.Auth),
-		Oauth: NewOAuthController(service.OAuth, cfg), // Pass cfg here
+		User:       NewUserController(service.User, service.Auth),
+		Oauth:      NewOAuthController(service.OAuth, cfg), // Pass cfg here
+		SportsData: NewSportsDataController(service.ML, service.Fixtures), // Instantiate SportsDataController with FixturesService
 	}
 }
