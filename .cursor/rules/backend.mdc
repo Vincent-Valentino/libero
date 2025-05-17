@@ -1,0 +1,50 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Architecture Pattern:
+Follows a clean, layered architecture with clear separation of concerns
+Uses a service-oriented architecture with dependency injection
+Implements the Repository pattern for data access
+
+Core Components:
+App: Main application struct that orchestrates all components
+Router: Uses Gorilla Mux for HTTP routing
+Repository: Data access layer
+Service: Business logic layer
+Scheduler: Background task management
+
+Config: Application configuration management
+
+
+Key Features:
+CORS support with configurable options
+Graceful shutdown handling
+Cache management with automatic cleanup
+Environment variable configuration using godotenv
+Background task scheduling
+HTTP server with timeout configurations
+Development Tools:
+Uses Air for hot reloading (.air.toml)
+Development scripts for both Windows (dev.bat) and Unix (dev.sh)
+Go modules for dependency management (go.mod and go.sum)
+Security Features:
+CORS configuration
+Authorization header support
+Environment variable based configuration
+Secure server timeouts
+Best Practices Implemented:
+Dependency injection
+Context-based cancellation
+Graceful shutdown
+Error handling and logging
+Modular and maintainable code structure
+Clear separation of concerns
+API Structure:
+RESTful API design
+Middleware support for cross-cutting concerns
+Route-based organization
+
+
+Service-based business logic
