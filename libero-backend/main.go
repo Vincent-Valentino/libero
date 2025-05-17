@@ -1,10 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/joho/godotenv"
 )
@@ -15,16 +15,21 @@ func main() {
 		log.Println("No .env file found")
 	}
 
-	// Get port from environment variable or use default
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
 	// Initialize the application
-	var app *App = initApp()
+	app := initApp()
 
-	// Start the server
-	fmt.Printf("Server running on port %s\n", port)
-	log.Fatal(http.ListenAndServe(":"+port, app.Router))
+	// Handle graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	
+	// Start the server in a goroutine
+	go app.Run()
+	
+	// Wait for termination signal
+	<-sigChan
+	log.Println("Shutting down server...")
+	
+	// Clean up resources
+	app.Shutdown()
+	log.Println("Server shut down complete")
 }

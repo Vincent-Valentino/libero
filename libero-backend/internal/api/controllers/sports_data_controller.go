@@ -10,12 +10,12 @@ import (
 
 // SportsDataController handles HTTP requests for sports data.
 type SportsDataController struct {
-	mlService       *service.MLService      // Use pointer for service dependency
+	mlService       service.MLService      // Changed to interface type
 	fixturesService service.FixturesService // Add FixturesService dependency
 }
 
 // NewSportsDataController creates a new sports data controller instance.
-func NewSportsDataController(mlService *service.MLService, fixturesService service.FixturesService) *SportsDataController {
+func NewSportsDataController(mlService service.MLService, fixturesService service.FixturesService) *SportsDataController {
 	return &SportsDataController{
 		mlService:       mlService,
 		fixturesService: fixturesService,

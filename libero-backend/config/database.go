@@ -41,6 +41,8 @@ func InitDB(config *Config) *gorm.DB {
 func migrateDB(db *gorm.DB) {
 	err := db.AutoMigrate(
 		&models.User{},
+		&models.CachedFixtures{},
+		&models.CachedTodayFixtures{},
 		// Add more models here as needed
 	)
 	

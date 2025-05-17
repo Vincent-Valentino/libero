@@ -10,24 +10,31 @@ import (
 	"time"
 )
 
-// MLService handles communication with the libero-ml microservice.
-type MLService struct {
+// MLService defines the interface for ML-related operations.
+type MLService interface {
+	GetUpcomingMatches() ([]dto.MatchDTO, error)
+	GetResults() ([]dto.ResultDTO, error)
+	GetPlayerStats(playerID string) (*dto.PlayerStatsDTO, error)
+}
+
+// mlService implements the MLService interface.
+type mlService struct {
 	baseURL    string
 	httpClient *http.Client
 }
 
 // NewMLService creates a new MLService instance.
-func NewMLService(cfg *config.Config) *MLService {
-	return &MLService{
+func NewMLService(cfg *config.Config) MLService {
+	return &mlService{
 		baseURL: cfg.MLServiceURL,
 		httpClient: &http.Client{
-			Timeout: 10 * time.Second, // Add a reasonable timeout
+			Timeout: 10 * time.Second,
 		},
 	}
 }
 
 // GetUpcomingMatches fetches upcoming matches from the ML service.
-func (s *MLService) GetUpcomingMatches() ([]dto.MatchDTO, error) {
+func (s *mlService) GetUpcomingMatches() ([]dto.MatchDTO, error) {
 	endpoint := "/matches/upcoming"
 	targetURL := s.baseURL + endpoint
 
@@ -56,7 +63,7 @@ func (s *MLService) GetUpcomingMatches() ([]dto.MatchDTO, error) {
 }
 
 // GetResults fetches match results from the ML service.
-func (s *MLService) GetResults() ([]dto.ResultDTO, error) {
+func (s *mlService) GetResults() ([]dto.ResultDTO, error) {
 	endpoint := "/matches/results"
 	targetURL := s.baseURL + endpoint
 
@@ -84,7 +91,7 @@ func (s *MLService) GetResults() ([]dto.ResultDTO, error) {
 }
 
 // GetPlayerStats fetches player stats from the ML service.
-func (s *MLService) GetPlayerStats(playerID string) (*dto.PlayerStatsDTO, error) {
+func (s *mlService) GetPlayerStats(playerID string) (*dto.PlayerStatsDTO, error) {
 	// Ensure playerID is URL-safe, although less critical for path segments than query params
 	safePlayerID := url.PathEscape(playerID)
 	endpoint := fmt.Sprintf("/players/%s/stats", safePlayerID)
