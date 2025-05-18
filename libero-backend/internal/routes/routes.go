@@ -3,11 +3,12 @@ package routes
 import (
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"libero-backend/config" // Added config dependency
 
+	"github.com/gorilla/mux"
+
 	// "libero-backend/config" // Removed if not needed directly
-	"libero-backend/internal/api/controllers"
+	"libero-backend/internal/controllers"
 	"libero-backend/internal/middleware"
 	"libero-backend/internal/service" // Import service package
 )
@@ -32,7 +33,7 @@ func SetupRoutes(router *mux.Router, service *service.Service, cfg *config.Confi
 	api.HandleFunc("/matches/upcoming", ctrl.SportsData.HandleGetUpcomingMatches).Methods(http.MethodGet)
 	api.HandleFunc("/matches/results", ctrl.SportsData.HandleGetResults).Methods(http.MethodGet)
 	api.HandleFunc("/players/{player_id}/stats", ctrl.SportsData.HandleGetPlayerStats).Methods(http.MethodGet)
-	api.HandleFunc("/sports/fixtures/today", ctrl.SportsData.HandleGetTodaysFixtures).Methods(http.MethodGet) // Today's fixtures
+	api.HandleFunc("/sports/fixtures/today", ctrl.SportsData.HandleGetTodaysFixtures).Methods(http.MethodGet)    // Today's fixtures
 	api.HandleFunc("/sports/fixtures/summary", ctrl.SportsData.HandleGetFixturesSummary).Methods(http.MethodGet) // Fixtures summary per competition
 
 	// OAuth routes (public) - Using root router for /auth path
@@ -49,13 +50,13 @@ func SetupRoutes(router *mux.Router, service *service.Service, cfg *config.Confi
 	protected.Use(middleware.AuthMiddleware(authService)) // Inject AuthService
 
 	// User routes (Profile & Preferences)
-	protected.HandleFunc("/users/profile", ctrl.User.GetUserProfile).Methods(http.MethodGet)       // Get profile with preferences
+	protected.HandleFunc("/users/profile", ctrl.User.GetUserProfile).Methods(http.MethodGet)            // Get profile with preferences
 	protected.HandleFunc("/users/preferences", ctrl.User.UpdateUserPreferences).Methods(http.MethodPut) // Update preferences
 
 	// Admin routes (requires admin role)
 	admin := api.PathPrefix("/admin").Subrouter()
 	admin.Use(middleware.AuthMiddleware(authService)) // Inject AuthService
-	admin.Use(middleware.RoleMiddleware("admin")) // Example role check
+	admin.Use(middleware.RoleMiddleware("admin"))     // Example role check
 
 	admin.HandleFunc("/users", ctrl.User.ListUsers).Methods(http.MethodGet)
 	admin.HandleFunc("/users/{id:[0-9]+}", ctrl.User.GetUser).Methods(http.MethodGet)

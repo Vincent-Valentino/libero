@@ -7,7 +7,8 @@ import (
 	"encoding/json" // Added for potential user info parsing
 	"errors"        // Added for error handling
 	"fmt"
-	"io/ioutil"
+	"io"
+
 	"libero-backend/config"
 
 	"golang.org/x/oauth2"
@@ -84,8 +85,8 @@ type UserInfo struct {
 	ProviderID   string
 	Email        string
 	Name         string
-	AccessToken  string // The provider's access token
-	RefreshToken string // Optional: The provider's refresh token
+	AccessToken  string                 // The provider's access token
+	RefreshToken string                 // Optional: The provider's refresh token
 	RawData      map[string]interface{} // Raw data from provider for flexibility
 }
 
@@ -122,7 +123,7 @@ func (s *oauthService) HandleGoogleCallback(ctx context.Context, storedState str
 	}
 	defer response.Body.Close()
 
-	contents, err := ioutil.ReadAll(response.Body)
+	contents, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed reading user info response body: %w", err)
 	}
@@ -182,7 +183,7 @@ func (s *oauthService) HandleFacebookCallback(ctx context.Context, storedState s
 	}
 	defer resp.Body.Close()
 
-	contents, err := ioutil.ReadAll(resp.Body)
+	contents, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed reading facebook user info response body: %w", err)
 	}
@@ -241,7 +242,7 @@ func (s *oauthService) HandleGitHubCallback(ctx context.Context, storedState str
 	}
 	defer resp.Body.Close()
 
-	contents, err := ioutil.ReadAll(resp.Body)
+	contents, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed reading github user info response body: %w", err)
 	}
