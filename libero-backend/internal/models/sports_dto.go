@@ -1,4 +1,4 @@
-package dto
+package models
 
 import "time"
 
@@ -35,15 +35,15 @@ type PlayerStatsDTO struct {
 
 // FixtureMatchDTO represents a single match within a competition's fixtures.
 type FixtureMatchDTO struct {
-	MatchDate     time.Time `json:"match_date"`
-	HomeTeamName  string    `json:"home_team_name"`
-	AwayTeamName  string    `json:"away_team_name"`
-	HomeScore     *int      `json:"home_score,omitempty"` // Use pointer for optional (e.g., not started)
-	AwayScore     *int      `json:"away_score,omitempty"` // Use pointer for optional
-	MatchStatus   string    `json:"match_status"`       // e.g., "Scheduled", "Live", "Finished"
-	Venue         string    `json:"venue,omitempty"`
-	HomeLogoURL   string    `json:"home_logo_url,omitempty"`
-	AwayLogoURL   string    `json:"away_logo_url,omitempty"`
+	MatchDate    time.Time `json:"match_date"`
+	HomeTeamName string    `json:"home_team_name"`
+	AwayTeamName string    `json:"away_team_name"`
+	HomeScore    *int      `json:"home_score,omitempty"` // Use pointer for optional (e.g., not started)
+	AwayScore    *int      `json:"away_score,omitempty"` // Use pointer for optional
+	MatchStatus  string    `json:"match_status"`         // e.g., "Scheduled", "Live", "Finished"
+	Venue        string    `json:"venue,omitempty"`
+	HomeLogoURL  string    `json:"home_logo_url,omitempty"`
+	AwayLogoURL  string    `json:"away_logo_url,omitempty"`
 }
 
 // CompetitionFixturesDTO groups fixtures by competition.

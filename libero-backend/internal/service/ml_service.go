@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"libero-backend/config"
-	"libero-backend/internal/api/dto"
+	"libero-backend/internal/models"
 	"net/http"
 	"net/url"
 	"time"
@@ -12,9 +12,9 @@ import (
 
 // MLService defines the interface for ML-related operations.
 type MLService interface {
-	GetUpcomingMatches() ([]dto.MatchDTO, error)
-	GetResults() ([]dto.ResultDTO, error)
-	GetPlayerStats(playerID string) (*dto.PlayerStatsDTO, error)
+	GetUpcomingMatches() ([]models.MatchDTO, error)
+	GetResults() ([]models.ResultDTO, error)
+	GetPlayerStats(playerID string) (*models.PlayerStatsDTO, error)
 }
 
 // mlService implements the MLService interface.
@@ -34,7 +34,7 @@ func NewMLService(cfg *config.Config) MLService {
 }
 
 // GetUpcomingMatches fetches upcoming matches from the ML service.
-func (s *mlService) GetUpcomingMatches() ([]dto.MatchDTO, error) {
+func (s *mlService) GetUpcomingMatches() ([]models.MatchDTO, error) {
 	endpoint := "/matches/upcoming"
 	targetURL := s.baseURL + endpoint
 
@@ -54,7 +54,7 @@ func (s *mlService) GetUpcomingMatches() ([]dto.MatchDTO, error) {
 		return nil, fmt.Errorf("ml service returned non-OK status (%d) for %s", resp.StatusCode, targetURL)
 	}
 
-	var matches []dto.MatchDTO
+	var matches []models.MatchDTO
 	if err := json.NewDecoder(resp.Body).Decode(&matches); err != nil {
 		return nil, fmt.Errorf("failed to decode upcoming matches response from %s: %w", targetURL, err)
 	}
@@ -63,7 +63,7 @@ func (s *mlService) GetUpcomingMatches() ([]dto.MatchDTO, error) {
 }
 
 // GetResults fetches match results from the ML service.
-func (s *mlService) GetResults() ([]dto.ResultDTO, error) {
+func (s *mlService) GetResults() ([]models.ResultDTO, error) {
 	endpoint := "/matches/results"
 	targetURL := s.baseURL + endpoint
 
@@ -82,7 +82,7 @@ func (s *mlService) GetResults() ([]dto.ResultDTO, error) {
 		return nil, fmt.Errorf("ml service returned non-OK status (%d) for %s", resp.StatusCode, targetURL)
 	}
 
-	var results []dto.ResultDTO
+	var results []models.ResultDTO
 	if err := json.NewDecoder(resp.Body).Decode(&results); err != nil {
 		return nil, fmt.Errorf("failed to decode results response from %s: %w", targetURL, err)
 	}
@@ -91,7 +91,7 @@ func (s *mlService) GetResults() ([]dto.ResultDTO, error) {
 }
 
 // GetPlayerStats fetches player stats from the ML service.
-func (s *mlService) GetPlayerStats(playerID string) (*dto.PlayerStatsDTO, error) {
+func (s *mlService) GetPlayerStats(playerID string) (*models.PlayerStatsDTO, error) {
 	// Ensure playerID is URL-safe, although less critical for path segments than query params
 	safePlayerID := url.PathEscape(playerID)
 	endpoint := fmt.Sprintf("/players/%s/stats", safePlayerID)
@@ -115,7 +115,7 @@ func (s *mlService) GetPlayerStats(playerID string) (*dto.PlayerStatsDTO, error)
 		return nil, fmt.Errorf("ml service returned non-OK status (%d) for %s", resp.StatusCode, targetURL)
 	}
 
-	var stats dto.PlayerStatsDTO
+	var stats models.PlayerStatsDTO
 	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
 		return nil, fmt.Errorf("failed to decode player stats response from %s: %w", targetURL, err)
 	}
