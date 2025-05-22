@@ -1,23 +1,23 @@
 package controllers
 
 import (
-	"libero-backend/internal/service"
-	"libero-backend/config" // Added config import
+	"libero-backend/config"
+	"libero-backend/internal/repository"
+	serv "libero-backend/internal/service"
 )
 
 // Service provides access to all service operations
 type Controller struct {
 	User       *UserController
 	Oauth      *OAuthController
-	SportsData *SportsDataController // Added SportsDataController field
+	SportsData *SportsDataController
 }
 
 // New creates a new service instance with all services
-func New(service *service.Service, cfg *config.Config) *Controller { // Added cfg argument
-
+func New(service *serv.Service, cfg *config.Config, repo *repository.Repository) *Controller {
 	return &Controller{
 		User:       NewUserController(service.User, service.Auth),
-		Oauth:      NewOAuthController(service.OAuth, cfg), // Pass cfg here
-		SportsData: NewSportsDataController(service.ML, service.Fixtures), // Instantiate SportsDataController with FixturesService
+		Oauth:      NewOAuthController(service.OAuth, cfg),
+		SportsData: NewSportsDataController(service.ML, service.Fixtures, service.Football),
 	}
 }

@@ -3,22 +3,27 @@ package controllers
 import (
 	"fmt"
 	"libero-backend/internal/service"
+	"libero-backend/internal/utils"
+
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 )
 
 // SportsDataController handles HTTP requests for sports data.
 type SportsDataController struct {
-	mlService       service.MLService      // Changed to interface type
-	fixturesService service.FixturesService // Add FixturesService dependency
+	mlService       service.MLService
+	fixturesService service.FixturesService
+	footballService *service.FootballService
 }
 
 // NewSportsDataController creates a new sports data controller instance.
-func NewSportsDataController(mlService service.MLService, fixturesService service.FixturesService) *SportsDataController {
+func NewSportsDataController(mlService service.MLService, fixturesService service.FixturesService, footballService *service.FootballService) *SportsDataController {
 	return &SportsDataController{
 		mlService:       mlService,
 		fixturesService: fixturesService,
+		footballService: footballService,
 	}
 }
 
@@ -32,7 +37,7 @@ func (c *SportsDataController) HandleGetUpcomingMatches(w http.ResponseWriter, r
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, matches)
+	utils.RespondWithJSON(w, http.StatusOK, matches)
 }
 
 // HandleGetResults handles requests for match results.
@@ -45,7 +50,7 @@ func (c *SportsDataController) HandleGetResults(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, results)
+	utils.RespondWithJSON(w, http.StatusOK, results)
 }
 
 // HandleGetPlayerStats handles requests for player statistics.
@@ -72,47 +77,70 @@ func (c *SportsDataController) HandleGetPlayerStats(w http.ResponseWriter, r *ht
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, stats)
+	utils.RespondWithJSON(w, http.StatusOK, stats)
+}
+
+// HandleGetStandings handles requests for league standings
+func (c *SportsDataController) HandleGetStandings(w http.ResponseWriter, r *http.Request) {
+	competition := strings.ToUpper(r.URL.Query().Get("competition"))
+	if competition == "" {
+		http.Error(w, "competition code is required", http.StatusBadRequest)
+		return
+	}
+
+	standings, err := c.footballService.GetStandings(competition)
+	if err != nil {
+		fmt.Printf("Error fetching standings for %s: %v\n", competition, err)
+		http.Error(w, "Failed to retrieve standings data", http.StatusInternalServerError)
+		return
+	}
+
+	utils.RespondWithJSON(w, http.StatusOK, standings)
+}
+
+// HandleGetTopScorers handles requests for top scorers
+func (c *SportsDataController) HandleGetTopScorers(w http.ResponseWriter, r *http.Request) {
+	competition := strings.ToUpper(r.URL.Query().Get("competition"))
+	if competition == "" {
+		http.Error(w, "competition code is required", http.StatusBadRequest)
+		return
+	}
+
+	scorers, err := c.footballService.GetTopScorers(competition)
+	if err != nil {
+		fmt.Printf("Error fetching top scorers for %s: %v\n", competition, err)
+		http.Error(w, "Failed to retrieve top scorers data", http.StatusInternalServerError)
+		return
+	}
+
+	utils.RespondWithJSON(w, http.StatusOK, scorers)
 }
 
 // HandleGetTodaysFixtures handles requests for today's fixtures.
 func (c *SportsDataController) HandleGetTodaysFixtures(w http.ResponseWriter, r *http.Request) {
 	fixtures, err := c.fixturesService.GetTodaysFixtures()
 	if err != nil {
-		// Log the error server-side
 		fmt.Printf("Error fetching today's fixtures: %v\n", err)
 		http.Error(w, "Failed to retrieve today's fixtures", http.StatusInternalServerError)
 		return
 	}
-
-	respondWithJSON(w, http.StatusOK, fixtures)
+	utils.RespondWithJSON(w, http.StatusOK, fixtures)
 }
 
-// HandleGetFixturesSummary handles requests for a league summary (today/tomorrow/upcoming).
+// HandleGetFixturesSummary handles requests for fixtures summary
 func (c *SportsDataController) HandleGetFixturesSummary(w http.ResponseWriter, r *http.Request) {
-	// Expect query param: ?competition={code}
-	code := r.URL.Query().Get("competition")
-	if code == "" {
+	competition := r.URL.Query().Get("competition")
+	if competition == "" {
 		http.Error(w, "competition code is required", http.StatusBadRequest)
 		return
 	}
-	summary, err := c.fixturesService.GetFixturesSummary(code)
+
+	summary, err := c.fixturesService.GetFixturesSummary(competition)
 	if err != nil {
-		fmt.Printf("Error fetching fixtures summary for %s: %v\n", code, err)
+		fmt.Printf("Error fetching fixtures summary for %s: %v\n", competition, err)
 		http.Error(w, "Failed to retrieve fixtures summary", http.StatusInternalServerError)
 		return
 	}
-	respondWithJSON(w, http.StatusOK, summary)
-}
 
-/*
-// respondWithJSON is likely defined in another controller file within the same package.
-// If not, uncomment and use this helper function.
-func respondWithJSON(w http.ResponseWriter, statusCode int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	if data != nil {
-		json.NewEncoder(w).Encode(data)
-	}
+	utils.RespondWithJSON(w, http.StatusOK, summary)
 }
-*/

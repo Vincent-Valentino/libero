@@ -2,8 +2,8 @@ package controllers
 
 import (
 	"encoding/json"
-	"net/http"
 	"errors" // Added for error checking
+	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
@@ -11,11 +11,12 @@ import (
 	"libero-backend/internal/middleware"
 	"libero-backend/internal/models"
 	"libero-backend/internal/service"
+	"libero-backend/internal/utils"
 )
 
 // UserController handles HTTP requests for user-related operations
 type UserController struct {
-	service service.UserService
+	service     service.UserService
 	authService service.AuthService // Added AuthService dependency
 }
 
@@ -52,7 +53,7 @@ func (c *UserController) Register(w http.ResponseWriter, r *http.Request) {
 
 	// Return user data (without password)
 	response := user.ToResponse()
-	respondWithJSON(w, http.StatusCreated, response)
+	utils.RespondWithJSON(w, http.StatusCreated, response)
 }
 
 // Login handles user login requests
@@ -89,7 +90,7 @@ func (c *UserController) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the JWT token
-	respondWithJSON(w, http.StatusOK, map[string]string{"token": token})
+	utils.RespondWithJSON(w, http.StatusOK, map[string]string{"token": token})
 }
 
 // GetUserProfile handles requests to get the current user's profile including preferences
@@ -98,7 +99,7 @@ func (c *UserController) GetUserProfile(w http.ResponseWriter, r *http.Request) 
 	// Get user from context (set by the auth middleware)
 	claims, ok := middleware.GetUserFromContext(ctx)
 	if !ok {
-		respondWithJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		utils.RespondWithJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
 		return
 	}
 
@@ -113,7 +114,7 @@ func (c *UserController) GetUserProfile(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, profile)
+	utils.RespondWithJSON(w, http.StatusOK, profile)
 }
 
 // UpdateProfile handles requests to update the current user's profile
@@ -165,7 +166,7 @@ func (c *UserController) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the updated user profile (without sensitive info)
-	respondWithJSON(w, http.StatusOK, user.ToResponse())
+	utils.RespondWithJSON(w, http.StatusOK, user.ToResponse())
 }
 
 // GetUser handles requests to get a specific user by ID
@@ -187,7 +188,7 @@ func (c *UserController) GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, user.ToResponse()) // Use ToResponse
+	utils.RespondWithJSON(w, http.StatusOK, user.ToResponse()) // Use ToResponse
 }
 
 // ListUsers handles requests to list users with pagination
@@ -216,9 +217,8 @@ func (c *UserController) ListUsers(w http.ResponseWriter, r *http.Request) {
 		userResponses[i] = u.ToResponse()
 	}
 
-
 	// Return users with pagination metadata
-	respondWithJSON(w, http.StatusOK, map[string]interface{}{
+	utils.RespondWithJSON(w, http.StatusOK, map[string]interface{}{
 		"users":       userResponses, // Return responses
 		"total":       total,
 		"page":        page,
@@ -254,14 +254,14 @@ func (c *UserController) UpdateUserPreferences(w http.ResponseWriter, r *http.Re
 	// Get user from context
 	claims, ok := middleware.GetUserFromContext(ctx)
 	if !ok {
-		respondWithJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		utils.RespondWithJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
 		return
 	}
 
 	// Parse request body
 	var req models.UpdatePreferencesRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondWithJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request payload"})
+		utils.RespondWithJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request payload"})
 		return
 	}
 
@@ -271,19 +271,10 @@ func (c *UserController) UpdateUserPreferences(w http.ResponseWriter, r *http.Re
 		// The service currently logs warnings but returns nil.
 		// If the service were to return errors (e.g., for invalid IDs), handle them here.
 		// log.Printf("Error updating preferences for user %d: %v", claims.UserID, err)
-		respondWithJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update preferences"})
+		utils.RespondWithJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update preferences"})
 		return
 	}
 
 	// Respond with No Content on success
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// Helper function to send JSON response
-func respondWithJSON(w http.ResponseWriter, statusCode int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	if data != nil {
-		json.NewEncoder(w).Encode(data)
-	}
 }
