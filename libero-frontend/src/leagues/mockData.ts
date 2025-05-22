@@ -63,6 +63,14 @@ interface LeagueData {
   history: LeagueHistoryItem[];
 }
 
+interface LeagueMetadata {
+  id: string;
+  name: string;
+  code: string;
+  logo: string;
+  themeColor: string;
+}
+
 // --- Mock Teams (Add more as needed) ---
 const premierLeagueTeams: Record<string, Team> = {
   mci: { id: 'mci', name: 'Man City', logo: '/path/to/mci.png' }, // Placeholder logo
@@ -193,4 +201,56 @@ export const allLeaguesData: Record<string, LeagueData> = {
   'ligue-1': ligue1MockData,
 };
 
-export type { LeagueData, Match, PlayerStat, LeagueTableRow, LeagueHistoryItem, Team, Player }; // Export types
+export type { LeagueData, Match, PlayerStat, LeagueTableRow, LeagueHistoryItem, Team, Player, LeagueMetadata }; // Export types
+
+export const leagueMetadata: Record<string, LeagueMetadata> = {
+  'PL': {
+    id: 'PL',
+    name: 'Premier League',
+    code: 'PL',
+    logo: '/Premier League.svg',
+    themeColor: '#37003C'
+  },
+  'PD': {
+    id: 'PD',
+    name: 'La Liga',
+    code: 'PD',
+    logo: '/LaLiga.svg',
+    themeColor: '#FF4B7D'
+  },
+  'SA': {
+    id: 'SA',
+    name: 'Serie A',
+    code: 'SA',
+    logo: '/Lega Serie A.svg',
+    themeColor: '#024494'
+  },
+  'BL1': {
+    id: 'BL1',
+    name: 'Bundesliga',
+    code: 'BL1',
+    logo: '/Bundesliga.svg',
+    themeColor: '#D20515'
+  },
+  'FL1': {
+    id: 'FL1',
+    name: 'Ligue 1',
+    code: 'FL1',
+    logo: '/Ligue 1 Uber Eats.svg',
+    themeColor: '#DED531'
+  },
+  'CL': {
+    id: 'CL',
+    name: 'Champions League',
+    code: 'CL',
+    logo: '/UCL.svg',
+    themeColor: '#1D3072'
+  },
+  'EL': {
+    id: 'EL',
+    name: 'Europa League',
+    code: 'EL',
+    logo: '/UEL.svg',
+    themeColor: '#FF6900'
+  }
+};
