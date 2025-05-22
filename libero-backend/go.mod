@@ -7,7 +7,6 @@ toolchain go1.23.2
 require (
 	github.com/gorilla/mux v1.8.1
 	github.com/joho/godotenv v1.5.1
-	github.com/rs/cors v1.11.1
 	golang.org/x/crypto v0.36.0
 	golang.org/x/oauth2 v0.28.0
 	gorm.io/driver/postgres v1.5.11
