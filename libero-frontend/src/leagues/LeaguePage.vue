@@ -1,177 +1,117 @@
 <template>
-  <div class="bg-gray-100 p-4 min-h-screen">
-    <h1 class="text-3xl font-bold mb-6 md:mb-10 flex items-center" :style="{ color: leagueData?.themeColor || '#cccccc', borderBottom: `3px solid ${leagueData?.themeColor || '#cccccc'}`, paddingBottom: '0.5rem' }">
-      <img v-if="leagueData?.logo" :src="leagueData.logo" :alt="leagueData.name" class="h-8 mr-3">
-      {{ leagueData?.name || 'League' }}
-    </h1>
-
-    <!-- Leagues Navigation -->
-    <div class="flex overflow-x-auto p-4 mb-4 gap-4 mt-15 bg-white w-full">
-      <router-link 
-        v-for="(league, id) in allLeaguesData" 
-        :key="id" 
-        :to="`/${id}`" 
-        class="flex flex-col items-center min-w-[80px] cursor-pointer transition-transform hover:scale-105"
-        :class="{ 'opacity-100 font-bold': leagueId === id, 'opacity-70': leagueId !== id }"
-      >
-        <img :src="league.logo" :alt="league.name" class="h-10 w-10 object-contain mb-1">
-        <span class="text-xs text-center" :style="{ color: leagueId === id ? league.themeColor : 'inherit' }">{{ league.name }}</span>
-      </router-link>
-    </div>
-
-    <!-- Loading State -->
-    <div v-if="isLoading" class="text-center text-gray-500 mt-20 md:mt-40">
-      Loading league data...
-    </div>
-
-    <!-- Error State -->
-    <div v-else-if="error" class="text-center text-red-500 mt-20 md:mt-40 p-4 bg-red-100 rounded border border-red-300">
-      Error loading league data: {{ error }}
-    </div>
-
-    <!-- Content Area: Only show if NOT loading, NO error, and data EXISTS -->
-    <div v-else-if="leagueData" class=" mb-10 flex flex-col md:grid md:grid-cols-3 md:grid-rows-3 md:gap-6">
-      <!-- Mobile view - Order components differently -->
-      <div class="block md:hidden space-y-5">
-        <!-- League Table - Most important content first on mobile -->
-        <div class="bg-white shadow rounded overflow-hidden min-h-[400px]">
-          <LeagueTable
-            :tableData="leagueData.table"
-            :themeColor="leagueData.themeColor"
-          />
-        </div>
-        
-        <!-- Upcoming Matches - Second most important -->
-        <div class="bg-white shadow rounded overflow-hidden">
-          <UpcomingMatches
-            :matches="leagueData.upcomingMatches"
-            :themeColor="leagueData.themeColor"
-          />
-        </div>
-  
-        <!-- Player Showdown -->
-        <div class="bg-white shadow rounded overflow-hidden">
-          <PlayerShowdown
-            :topScorers="leagueData.topScorers"
-            :topAssists="leagueData.topAssists"
-            :mostCleanSheets="leagueData.mostCleanSheets"
-            :themeColor="leagueData.themeColor"
-          />
-        </div>
-  
-        <!-- League History -->
-        <div class="bg-white shadow rounded overflow-hidden">
-          <LeagueHistory
-            :history="leagueData.history"
-            :themeColor="leagueData.themeColor"
-          />
-        </div>
+  <div class="league-page">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <!-- League Header -->
+      <div class="league-header flex items-center mb-8" v-if="currentLeague">
+        <img :src="currentLeague.logo" :alt="currentLeague.name" class="w-16 h-16 mr-4">
+        <h1 class="text-3xl font-bold" :style="{ color: currentLeague.themeColor }">{{ currentLeague.name }}</h1>
       </div>
 
-      <!-- Desktop view - Grid layout -->
-      <div class="hidden md:block md:row-span-3 h-full">
-        <div class="bg-white shadow rounded overflow-hidden h-full">
-          <LeagueTable
-            :tableData="leagueData.table"
-            :themeColor="leagueData.themeColor"
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Left Column: League Table -->
+        <div class="lg:col-span-2">
+          <LeagueTable 
+            :tableData="standings" 
+            :themeColor="currentLeague?.themeColor || '#000'"
+            :isLoading="isLoadingStandings"
+            :error="standingsError"
           />
         </div>
-      </div>
-      
-      <div class="hidden md:block md:col-span-2 md:row-span-2">
-        <div class="bg-white shadow rounded overflow-hidden h-full">
-          <UpcomingMatches
-            :matches="leagueData.upcomingMatches"
-            :themeColor="leagueData.themeColor"
-          />
-        </div>
-      </div>
 
-      <div class="hidden md:block md:col-span-1">
-        <div class="bg-white shadow rounded overflow-hidden h-full">
-          <PlayerShowdown
-            :topScorers="leagueData.topScorers"
-            :topAssists="leagueData.topAssists"
-            :mostCleanSheets="leagueData.mostCleanSheets"
-            :themeColor="leagueData.themeColor"
-          />
-        </div>
-      </div>
+        <!-- Right Column: Stats -->
+        <div class="stats-column space-y-8">
+          <!-- Top Scorers -->
+          <div class="bg-white rounded-lg shadow p-4">
+            <h3 class="text-lg font-semibold mb-4" :style="{ color: currentLeague?.themeColor }">Top Scorers</h3>
+            <div v-if="!isLoadingScorers && !scorersError && topScorers.length > 0" class="space-y-4">
+              <div v-for="scorer in topScorers.slice(0, 5)" :key="scorer.id" class="flex items-center">
+                <img :src="scorer.photo" :alt="scorer.name" class="w-12 h-12 rounded-full mr-4 object-cover">
+                <div>
+                  <div class="font-medium">{{ scorer.name }}</div>
+                  <div class="text-sm text-gray-500">{{ scorer.team.name }}</div>
+                </div>
+                <div class="ml-auto font-bold">{{ scorer.value }} goals</div>
+              </div>
+            </div>
+            <div v-else-if="isLoadingScorers" class="flex justify-center p-4">
+              <div class="animate-spin rounded-full h-5 w-5 border-2" :style="{ borderColor: `${currentLeague?.themeColor} transparent` }"></div>
+            </div>
+            <div v-else-if="scorersError" class="text-red-600 text-sm p-4">
+              {{ scorersError }}
+            </div>
+            <p v-else class="text-gray-500 text-center p-4">No scorer data available</p>
+          </div>
 
-      <div class="hidden md:block md:col-span-1">
-        <div class="bg-white shadow rounded overflow-hidden h-full">
-          <LeagueHistory
-            :history="leagueData.history"
-            :themeColor="leagueData.themeColor"
-          />
+          <!-- Upcoming Matches -->
+          <div class="bg-white rounded-lg shadow p-4">
+            <h3 class="text-lg font-semibold mb-4" :style="{ color: currentLeague?.themeColor }">Upcoming Matches</h3>
+            <div v-if="!isLoadingFixtures && !fixturesError && fixtures.length > 0" class="space-y-4">
+              <div v-for="match in fixtures.slice(0, 3)" :key="match.match_date" class="text-sm">
+                <div class="flex justify-between items-center">
+                  <span>{{ match.home_team_name }}</span>
+                  <span class="text-gray-500">vs</span>
+                  <span>{{ match.away_team_name }}</span>
+                </div>
+                <div class="text-gray-500 text-xs mt-1">{{ formatDate(match.match_date) }}</div>
+              </div>
+            </div>
+            <div v-else-if="isLoadingFixtures" class="flex justify-center p-4">
+              <div class="animate-spin rounded-full h-5 w-5 border-2" :style="{ borderColor: `${currentLeague?.themeColor} transparent` }"></div>
+            </div>
+            <div v-else-if="fixturesError" class="text-red-600 text-sm p-4">
+              {{ fixturesError }}
+            </div>
+            <p v-else class="text-gray-500 text-center">No upcoming matches</p>
+          </div>
         </div>
       </div>
     </div>
-
-    <!-- No Data State: Only show if NOT loading, NO error, and NO data -->
-    <div v-else class="text-center text-gray-500 mt-20 md:mt-40">
-       Data not available for this league.
-    </div>
-
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { allLeaguesData, type LeagueData } from './mockData';
-
-// Import the components
-import UpcomingMatches from './components/UpcomingMatches.vue';
-import PlayerShowdown from './components/PlayerShowdown.vue';
+import { useLeagueStore } from '@/stores/league';
 import LeagueTable from './components/LeagueTable.vue';
-import LeagueHistory from './components/LeagueHistory.vue';
+import { leagueMetadata } from './mockData';
 
 const route = useRoute();
-// Ensure leagueId updates reactively when the route changes
-const leagueId = computed(() => {
-    // Extract the last part of the path as the league identifier
-    const pathSegments = route.path.split('/');
-    return pathSegments[pathSegments.length - 1] || '';
+const store = useLeagueStore();
+
+// Get current league metadata based on route params
+const currentLeague = computed(() => {
+  const code = route.params.code as string || 'PL';
+  return leagueMetadata[code];
 });
 
-const leagueData = ref<LeagueData | null>(null);
+// Get data from store
+const standings = computed(() => store.standings);
+const topScorers = computed(() => store.topScorers);
+const fixtures = computed(() => store.fixtures);
 
-const isLoading = ref(false);
-const error = ref<string | null>(null);
+// Get loading states from store
+const isLoadingStandings = computed(() => store.isLoadingStandings);
+const isLoadingScorers = computed(() => store.isLoadingScorers);
+const isLoadingFixtures = computed(() => store.isLoadingFixtures);
 
-const loadLeagueData = (id: string) => {
-  isLoading.value = true;
-  error.value = null;
-  leagueData.value = null; // Clear previous data
+// Get error states from store
+const standingsError = computed(() => store.standingsError);
+const scorersError = computed(() => store.scorersError);
+const fixturesError = computed(() => store.fixturesError);
 
-  // Simulate async fetch (replace with actual API call later)
-  setTimeout(() => {
-    try {
-      if (id && allLeaguesData[id]) {
-        leagueData.value = allLeaguesData[id];
-        console.log(`Loaded data for: ${id}`);
-      } else {
-        console.warn(`No data found for league ID: ${id}`);
-        // Keep leagueData null, the 'No Data' state will show
-      }
-    } catch (err) {
-      console.error("Error loading league data:", err);
-      error.value = err instanceof Error ? err.message : 'An unknown error occurred';
-    } finally {
-      isLoading.value = false;
-    }
-  }, 500); // Simulate 500ms network delay
+// Format date helper function
+const formatDate = (dateStr: string) => {
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric'
+  });
 };
 
 // Load data when component mounts
-onMounted(() => {
-  loadLeagueData(leagueId.value);
+onMounted(async () => {
+  const competitionCode = (route.params.code as string) || 'PL';
+  await store.fetchAllLeagueData(competitionCode);
 });
-
-// Watch for changes in leagueId (when navigating between league pages)
-watch(leagueId, (newId) => {
-  loadLeagueData(newId);
-});
-
 </script>
