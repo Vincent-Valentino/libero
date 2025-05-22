@@ -1,24 +1,26 @@
 package routes
 
 import (
-	"net/http"
-
-	"libero-backend/config" // Added config dependency
-
-	"github.com/gorilla/mux"
-
-	// "libero-backend/config" // Removed if not needed directly
+	"encoding/json"
+	"libero-backend/config"
 	"libero-backend/internal/controllers"
 	"libero-backend/internal/middleware"
-	"libero-backend/internal/service" // Import service package
+	"libero-backend/internal/repository"
+	"libero-backend/internal/service"
+	"net/http"
+
+	"github.com/gorilla/mux"
 )
 
+// healthCheck is a simple health check endpoint
+func healthCheck(w http.ResponseWriter, r *http.Request) {
+	json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+}
+
 // SetupRoutes configures all API routes
-// It now accepts the main service struct to access all services
-func SetupRoutes(router *mux.Router, service *service.Service, cfg *config.Config) { // Added cfg
+func SetupRoutes(router *mux.Router, service *service.Service, cfg *config.Config, repo *repository.Repository) {
 	// Extract controllers and services needed
-	// Instantiate the main controller which holds sub-controllers
-	ctrl := controllers.New(service, cfg)
+	ctrl := controllers.New(service, cfg, repo)
 	authService := service.Auth // Get AuthService for middleware
 
 	// API routes
@@ -26,17 +28,19 @@ func SetupRoutes(router *mux.Router, service *service.Service, cfg *config.Confi
 
 	// Public routes (no authentication required)
 	api.HandleFunc("/health", healthCheck).Methods(http.MethodGet)
-	api.HandleFunc("/auth/register", ctrl.User.Register).Methods(http.MethodPost) // Changed path prefix
-	api.HandleFunc("/auth/login", ctrl.User.Login).Methods(http.MethodPost)       // Changed path prefix
+	api.HandleFunc("/auth/register", ctrl.User.Register).Methods(http.MethodPost)
+	api.HandleFunc("/auth/login", ctrl.User.Login).Methods(http.MethodPost)
 
-	// NEW: Public Sports Data routes
+	// Sports data routes
+	api.HandleFunc("/sports/fixtures/today", ctrl.SportsData.HandleGetTodaysFixtures).Methods(http.MethodGet)
+	api.HandleFunc("/sports/fixtures/summary", ctrl.SportsData.HandleGetFixturesSummary).Methods(http.MethodGet)
+	api.HandleFunc("/standings", ctrl.SportsData.HandleGetStandings).Methods(http.MethodGet)
+	api.HandleFunc("/topscorers", ctrl.SportsData.HandleGetTopScorers).Methods(http.MethodGet)
 	api.HandleFunc("/matches/upcoming", ctrl.SportsData.HandleGetUpcomingMatches).Methods(http.MethodGet)
 	api.HandleFunc("/matches/results", ctrl.SportsData.HandleGetResults).Methods(http.MethodGet)
 	api.HandleFunc("/players/{player_id}/stats", ctrl.SportsData.HandleGetPlayerStats).Methods(http.MethodGet)
-	api.HandleFunc("/sports/fixtures/today", ctrl.SportsData.HandleGetTodaysFixtures).Methods(http.MethodGet)    // Today's fixtures
-	api.HandleFunc("/sports/fixtures/summary", ctrl.SportsData.HandleGetFixturesSummary).Methods(http.MethodGet) // Fixtures summary per competition
 
-	// OAuth routes (public) - Using root router for /auth path
+	// OAuth routes
 	auth := router.PathPrefix("/auth").Subrouter()
 	auth.HandleFunc("/google/login", ctrl.Oauth.GoogleLogin).Methods(http.MethodGet)
 	auth.HandleFunc("/google/callback", ctrl.Oauth.GoogleCallback).Methods(http.MethodGet)
@@ -45,27 +49,11 @@ func SetupRoutes(router *mux.Router, service *service.Service, cfg *config.Confi
 	auth.HandleFunc("/github/login", ctrl.Oauth.GitHubLogin).Methods(http.MethodGet)
 	auth.HandleFunc("/github/callback", ctrl.Oauth.GitHubCallback).Methods(http.MethodGet)
 
-	// Protected routes (authentication required)
+	// Protected routes (require authentication)
 	protected := api.PathPrefix("").Subrouter()
-	protected.Use(middleware.AuthMiddleware(authService)) // Inject AuthService
+	protected.Use(middleware.AuthMiddleware(authService))
 
-	// User routes (Profile & Preferences)
-	protected.HandleFunc("/users/profile", ctrl.User.GetUserProfile).Methods(http.MethodGet)            // Get profile with preferences
-	protected.HandleFunc("/users/preferences", ctrl.User.UpdateUserPreferences).Methods(http.MethodPut) // Update preferences
-
-	// Admin routes (requires admin role)
-	admin := api.PathPrefix("/admin").Subrouter()
-	admin.Use(middleware.AuthMiddleware(authService)) // Inject AuthService
-	admin.Use(middleware.RoleMiddleware("admin"))     // Example role check
-
-	admin.HandleFunc("/users", ctrl.User.ListUsers).Methods(http.MethodGet)
-	admin.HandleFunc("/users/{id:[0-9]+}", ctrl.User.GetUser).Methods(http.MethodGet)
-	admin.HandleFunc("/users/{id:[0-9]+}", ctrl.User.DeleteUser).Methods(http.MethodDelete)
-}
-
-// healthCheck is a simple health check endpoint
-func healthCheck(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"ok"}`))
+	// User routes
+	protected.HandleFunc("/users/profile", ctrl.User.GetUserProfile).Methods(http.MethodGet)
+	protected.HandleFunc("/users/preferences", ctrl.User.UpdateUserPreferences).Methods(http.MethodPut)
 }
