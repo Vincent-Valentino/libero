@@ -96,6 +96,34 @@ export interface FixturesSummaryDTO {
   upcoming: FixtureMatchDTO[];
 }
 
+// --- League Table & Player Stats DTOs ---
+export interface LeagueTableRow {
+  position: number;
+  team: {
+    id: number;
+    name: string;
+    logo: string;
+  };
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalDifference: number;
+  points: number;
+}
+
+export interface PlayerStat {
+  id: number;
+  name: string;
+  team: {
+    id: number;
+    name: string;
+    logo: string;
+  };
+  value: number; // goals, assists, or clean sheets
+  photo: string;
+}
+
 // Base URL for the backend API
 // TODO: Make this configurable via environment variables (.env)
 // Use relative path for API calls; Vite proxy will handle forwarding
@@ -244,6 +272,124 @@ export const getTodaysFixtures = (): Promise<CompetitionFixturesDTO[]> => {
 export const getFixturesSummary = (competitionCode: string): Promise<FixturesSummaryDTO> => {
   return apiClient.get<FixturesSummaryDTO>(`/sports/fixtures/summary?competition=${competitionCode}`)
     .then(response => response.data);
+};
+
+
+// interface StandingsResponse {
+//   standings: Array<{
+//     stage: string;
+//     table: Array<{
+//       position: number;
+//       team: {
+//         id: number;
+//         name: string;
+//         crest: string;
+//       };
+//       playedGames: number;
+//       won: number;
+//       draw: number;
+//       lost: number;
+//       points: number;
+//       goalsFor: number;
+//       goalsAgainst: number;
+//       goalDifference: number;
+//     }>;
+//   }>;
+// }
+
+// export const getStandings = async (competitionCode: string): Promise<LeagueTableRow[]> => {
+//   const response = await apiClient.get<StandingsResponse>(`/standings?competition=${competitionCode}`);
+//   // Find the total standings (usually the first group for league format)
+//   const totalStandings = response.data.standings.find(s => s.stage === 'REGULAR_SEASON') || response.data.standings[0];
+  
+//   return totalStandings.table.map(row => ({
+//     position: row.position,
+//     team: {
+//       id: row.team.id,
+//       name: row.team.name,
+//       logo: row.team.crest
+//     },
+//     played: row.playedGames,
+//     won: row.won,
+//     drawn: row.draw,
+//     lost: row.lost,
+//     goalDifference: row.goalDifference,
+//     points: row.points
+//   }));
+// };
+
+
+// In api.ts, for clarity, rename this:
+interface BackendCompetitionStandingsDTO { // Previously StandingsResponse
+  competition_name: string;              // From models.CompetitionStandingsDTO
+  competition_code: string;              // From models.CompetitionStandingsDTO
+  season: number;                        // From models.CompetitionStandingsDTO
+  standings: Array<{                     // This is models.StandingsTableDTO
+    position: number;
+    team_name: string; // from backend StandingsTableDTO
+    team_crest: string; // from backend StandingsTableDTO
+    played: number;
+    won: number;
+    drawn: number; // "drawn" in backend DTO
+    lost: number;
+    goals_for: number;
+    goals_against: number;
+    goal_difference: number;
+    points: number;
+  }>;
+}
+
+export const getStandings = async (competitionCode: string): Promise<LeagueTableRow[]> => {
+  // Expecting backend to return CompetitionStandingsDTO
+  const response = await apiClient.get<BackendCompetitionStandingsDTO>(`/standings?competition=${competitionCode}`);
+
+  // The transformation logic here is to convert BackendCompetitionStandingsDTO.standings
+  // (which is StandingsTableDTO[]) into LeagueTableRow[]
+  return response.data.standings.map(row => ({
+    position: row.position,
+    team: {
+      id: 0, // Needs to come from somewhere if required; StandingsTableDTO doesn't have team ID
+      name: row.team_name,
+      logo: row.team_crest,
+    },
+    played: row.played,
+    won: row.won,
+    drawn: row.drawn,
+    lost: row.lost,
+    goalDifference: row.goal_difference, // Align with backend DTO field name
+    points: row.points,
+  }));
+};
+interface ScorersResponse {
+  scorers: Array<{
+    player: {
+      id: number;
+      name: string;
+    };
+    team: {
+      id: number;
+      name: string;
+      crest: string;
+    };
+    goals: number;
+    assists: number;
+  }>;
+}
+
+export const getTopScorers = async (competitionCode: string): Promise<PlayerStat[]> => {
+  const response = await apiClient.get<ScorersResponse>(`/topscorers?competition=${competitionCode}`);
+  
+  return response.data.scorers.map(scorer => ({
+    id: scorer.player.id,
+    name: scorer.player.name,
+    team: {
+      id: scorer.team.id,
+      name: scorer.team.name,
+      logo: scorer.team.crest
+    },
+    value: scorer.goals,
+    photo: `/public/${scorer.player.name}.png` // Assuming player photos are stored with player names
+  }));
 };
 
 export default apiClient; // Export the configured instance if needed elsewhere
