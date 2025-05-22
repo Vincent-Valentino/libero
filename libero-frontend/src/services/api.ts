@@ -392,4 +392,4 @@ export const getTopScorers = async (competitionCode: string): Promise<PlayerStat
   }));
 };
 
-export default apiClient; // Export the configured instance if needed elsewhere
+export default apiClient; 

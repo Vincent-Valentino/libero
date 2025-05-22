@@ -19,6 +19,10 @@ type User struct {
 	Provider  string    `gorm:"index" json:"-"` // OAuth Provider (e.g., google), indexed
 	ProviderID string   `gorm:"index" json:"-"` // User ID from the OAuth provider, indexed
 
+	// Password reset fields
+	ResetToken         string    `gorm:"index" json:"-"` // Password reset token
+	ResetTokenExpiresAt time.Time `json:"-"` // When the reset token expires
+
 	// Relationships for Preferences
 	FollowedTeams        []*Team        `gorm:"many2many:user_followed_teams;" json:"followed_teams,omitempty"`
 	FollowedPlayers      []*Player      `gorm:"many2many:user_followed_players;" json:"followed_players,omitempty"`

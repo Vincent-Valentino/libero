@@ -1,14 +1,16 @@
 package models
 
-import "gorm.io/gorm"
+import "time"
 
-// Competition represents a sports competition (e.g., Premier League, NBA).
+// Competition represents a sports competition or league
 type Competition struct {
-	gorm.Model
-	ID            uint   `gorm:"primaryKey"`
-	Name          string `gorm:"uniqueIndex;not null"` // Name of the competition
-	Sport         string // e.g., "Football", "Basketball"
-	Region        string // e.g., "England", "USA", "International"
-	ExternalApiID string `gorm:"index"` // Optional: ID from an external data source
-	Users         []*User `gorm:"many2many:user_followed_competitions;"` // Users following this competition
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	Name      string    `gorm:"not null" json:"name"`
+	Code      string    `gorm:"uniqueIndex" json:"code,omitempty"`
+	Country   string    `json:"country,omitempty"`
+	LogoURL   string    `json:"logo_url,omitempty"`
+	Sport     string    `json:"sport,omitempty"`
+	Season    string    `json:"season,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }

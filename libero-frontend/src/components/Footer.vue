@@ -36,10 +36,6 @@
             <img src="https://cdn.simpleicons.org/postgresql/white" alt="PostgreSQL Logo" class="h-5 w-5 flex-shrink-0 object-contain">
             <span class="text-base">PostgreSQL ( Database )</span>
           </div>
-          <div class="flex items-center gap-3 hover:text-white transition-colors duration-200">
-             <img src="https://cdn.simpleicons.org/openai/white" alt="OpenAI Logo" class="h-5 w-5 flex-shrink-0 object-contain">
-            <span class="text-base">ChatGPT ( All in one )</span>
-          </div>
         </div>
       </div>
 
@@ -53,9 +49,6 @@
 
     <div class="mt-8 pt-8 border-t border-gray-700 flex flex-col sm:flex-row justify-between items-center text-sm text-gray-400">
       <p>&copy; {{ new Date().getFullYear() }} Libero Project. All rights reserved.</p>
-      <div class="flex gap-4 mt-4 sm:mt-0">
-        <p>(Social Links Placeholder)</p>
-      </div>
     </div>
   </footer>
 </template>

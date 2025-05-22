@@ -89,4 +89,31 @@ The application follows a clean architecture with clear separation of concerns:
 4. **Models**: Define data structures
 5. **DTOs**: Define data transfer objects
 
-Each component is defined by interfaces, allowing for loose coupling and easier testing. 
+Each component is defined by interfaces, allowing for loose coupling and easier testing.
+
+## Features
+- **User Authentication**: Register, login, password reset and change (`/auth/register`, `/auth/login`, `/auth/password/*`).
+- **OAuth2 Integration**: Social login with Google, Facebook, GitHub (`/auth/*/login`, `/auth/*/callback`).
+- **Sports Data API**: Fetch upcoming matches, results, player stats, fixtures summary (`/api/matches/*`, `/api/players/{id}/stats`).
+- **User Profile & Preferences**: Retrieve and update preferences (`GET /api/users/profile`, `PUT /api/users/preferences`).
+- **Background Tasks**:
+  - **Cache Cleanup**: Runs every 15 minutes to purge expired entries.
+  - **Fixtures Scheduler**: Refreshes fixtures data every 4 hours.
+
+## Data Flow & Request Lifecycle
+1. **Router Layer**: `routes.SetupRoutes` registers public and protected routes using Gorilla Mux.
+2. **Middleware**: CORS handling and JWT authentication (`AuthMiddleware`).
+3. **Controllers**: Parse HTTP requests, validate input DTOs, and invoke service methods.
+4. **Services**: Contain business logic and orchestrate calls to repositories and external APIs.
+5. **Repositories**: Abstract database interactions and caching logic (e.g., Redis or in-memory cache).
+6. **Response**: Controllers format service results into JSON responses with appropriate HTTP status codes.
+
+## Coding Style & Conventions
+- **Clean Architecture**: Separation into `controllers`, `service`, `repository`, `models`, `dto` packages under `internal/`.
+- **Dependency Injection**: Pass `Repository`, `Service`, and `Config` structs to constructors for testability.
+- **Routing & Middleware**: Use Gorilla Mux for flexible routing patterns and middleware chaining.
+- **Configuration**: Centralize in `config` package, loading from environment variables via `.env`.
+- **Logging**: Use Go's standard `log` package; structured logs recommended for production.
+- **Error Handling**: Wrap and return errors with context; controllers translate errors to HTTP responses.
+- **Project Layout**: Follow Go conventions (lowercase package names, `internal` for private code).
+- **Testing**: Write unit tests for services and controllers; mock repositories for isolation. 

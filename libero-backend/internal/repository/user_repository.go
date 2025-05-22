@@ -15,6 +15,7 @@ type UserRepository interface {
 	Delete(id uint) error
 	List(page, limit int) ([]models.User, int64, error)
 	FindByProvider(provider string, providerID string) (*models.User, error)
+	FindByResetToken(token string) (*models.User, error)
 
 	// Preference related methods
 	FindByIDWithPreferences(id uint) (*models.User, error)
@@ -111,6 +112,16 @@ func (r *userRepository) FindByProvider(provider string, providerID string) (*mo
 	err := r.db.Where("provider = ? AND provider_id = ?", provider, providerID).First(&user).Error
 	if err != nil {
 		// Consider returning a specific "not found" error type here
+		return nil, err
+	}
+	return &user, nil
+}
+
+// FindByResetToken retrieves a user by password reset token
+func (r *userRepository) FindByResetToken(token string) (*models.User, error) {
+	var user models.User
+	err := r.db.Where("reset_token = ?", token).First(&user).Error
+	if err != nil {
 		return nil, err
 	}
 	return &user, nil

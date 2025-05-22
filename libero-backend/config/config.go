@@ -86,7 +86,7 @@ func New() *Config {
 		FrontendURL: getEnv("FRONTEND_URL", "http://localhost:5173"), // Added Frontend URL loading (default Vite port)
 		MLServiceURL: getEnv("ML_SERVICE_URL", "http://localhost:8001"), // Added ML Service URL loading
 		ThirdPartyAPIKey:  getEnv("THIRD_PARTY_FOOTBALL_API_KEY", ""),
-		ThirdPartyBaseURL: getEnv("THIRD_PARTY_BASE_URL", "https://api.football-data.org/v2"),
+		ThirdPartyBaseURL: getEnv("THIRD_PARTY_BASE_URL", ""),
 	}
 }
 

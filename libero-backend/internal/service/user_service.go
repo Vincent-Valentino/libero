@@ -13,7 +13,9 @@ import (
 type UserService interface {
 	// Used by Auth/OAuth flows
 	FindUserByEmail(ctx context.Context, email string) (*models.User, error)
+	FindUserByUsername(ctx context.Context, username string) (*models.User, error)
 	FindUserByProvider(ctx context.Context, provider string, providerID string) (*models.User, error)
+	FindUserByResetToken(ctx context.Context, token string) (*models.User, error)
 	CreateUser(ctx context.Context, user *models.User) (*models.User, error)
 	UpdateUser(ctx context.Context, user *models.User) error
 
@@ -223,4 +225,16 @@ func (s *userService) UpdateUserPreferences(ctx context.Context, userID uint, re
 	// Currently returns nil even if some operations failed (logged as warnings).
 	// Consider returning a multi-error if stricter error handling is needed.
 	return nil
+}
+
+// FindUserByUsername finds a user by their username.
+func (s *userService) FindUserByUsername(ctx context.Context, username string) (*models.User, error) {
+	// Call the repository method
+	return s.userRepo.FindByUsername(username)
+}
+
+// FindUserByResetToken finds a user by their reset token.
+func (s *userService) FindUserByResetToken(ctx context.Context, token string) (*models.User, error) {
+	// Call the repository method
+	return s.userRepo.FindByResetToken(token)
 }
