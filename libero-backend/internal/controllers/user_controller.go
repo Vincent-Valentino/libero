@@ -279,6 +279,134 @@ func (c *UserController) UpdateUserPreferences(w http.ResponseWriter, r *http.Re
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// ChangePassword handles password change requests for authenticated users
+func (c *UserController) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	// Get user from context
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	
+	// Parse request
+	var req struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+		ConfirmPassword string `json:"confirm_password"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+	
+	// Validate input
+	if req.CurrentPassword == "" || req.NewPassword == "" || req.ConfirmPassword == "" {
+		http.Error(w, "All password fields are required", http.StatusBadRequest)
+		return
+	}
+	
+	// Change password
+	err := c.authService.ChangePassword(ctx, claims.UserID, req.CurrentPassword, req.NewPassword, req.ConfirmPassword)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidCredentials):
+			http.Error(w, "Current password is incorrect", http.StatusUnauthorized)
+		case errors.Is(err, service.ErrPasswordMismatch):
+			http.Error(w, "New password and confirmation do not match", http.StatusBadRequest)
+		case errors.Is(err, service.ErrWeakPassword):
+			http.Error(w, "Password does not meet security requirements", http.StatusBadRequest)
+		case errors.Is(err, service.ErrSamePassword):
+			http.Error(w, "New password must be different from current password", http.StatusBadRequest)
+		default:
+			http.Error(w, "Failed to change password", http.StatusInternalServerError)
+		}
+		return
+	}
+	
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// RequestPasswordReset handles password reset requests
+func (c *UserController) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	// Parse request
+	var req struct {
+		Email string `json:"email"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+	
+	// Validate email
+	if req.Email == "" {
+		http.Error(w, "Email is required", http.StatusBadRequest)
+		return
+	}
+	
+	// Request password reset
+	// In production, this would send an email and not return the token
+	token, err := c.authService.RequestPasswordReset(ctx, req.Email)
+	if err != nil {
+		// Log error but don't reveal if email exists or not
+		http.Error(w, "If the email is registered, a reset link will be sent", http.StatusOK)
+		return
+	}
+	
+	// For development/testing, return the token directly
+	// In production, this would just return a success message
+	respondWithJSON(w, http.StatusOK, map[string]string{
+		"message": "Password reset request processed",
+		"token": token, // Remove this in production
+	})
+}
+
+// ResetPassword handles password reset with token
+func (c *UserController) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	// Parse request
+	var req struct {
+		Token          string `json:"token"`
+		NewPassword    string `json:"new_password"`
+		ConfirmPassword string `json:"confirm_password"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+	
+	// Validate input
+	if req.Token == "" || req.NewPassword == "" || req.ConfirmPassword == "" {
+		http.Error(w, "All fields are required", http.StatusBadRequest)
+		return
+	}
+	
+	// Reset password
+	err := c.authService.ResetPassword(ctx, req.Token, req.NewPassword, req.ConfirmPassword)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrResetTokenInvalid):
+			http.Error(w, "Reset token is invalid or has expired", http.StatusBadRequest)
+		case errors.Is(err, service.ErrPasswordMismatch):
+			http.Error(w, "New password and confirmation do not match", http.StatusBadRequest)
+		case errors.Is(err, service.ErrWeakPassword):
+			http.Error(w, "Password does not meet security requirements", http.StatusBadRequest)
+		default:
+			http.Error(w, "Failed to reset password", http.StatusInternalServerError)
+		}
+		return
+	}
+	
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // Helper function to send JSON response
 func respondWithJSON(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")

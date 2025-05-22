@@ -246,4 +246,145 @@ export const getFixturesSummary = (competitionCode: string): Promise<FixturesSum
     .then(response => response.data);
 };
 
+// --- Football Data API Types ---
+export interface FootballPlayer {
+  id: number;
+  name: string;
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: string;
+  nationality?: string;
+  position?: string;
+  photo?: string;
+}
+
+export interface FootballTeam {
+  id: number;
+  name: string;
+  shortName?: string;
+  crest?: string;
+}
+
+export interface TopScorer {
+  player: FootballPlayer;
+  team: FootballTeam;
+  playedMatches?: number;
+  goals: number;
+  assists?: number;
+  penalties?: number;
+}
+
+export interface TopScorersResponse {
+  count: number;
+  filters?: any;
+  competition?: any;
+  season?: any;
+  scorers: TopScorer[];
+}
+
+// --- Football Data API Client ---
+
+// Create a separate axios instance for football-data.org API
+const footballApiClient: AxiosInstance = axios.create({
+  baseURL: 'https://api.football-data.org/v4',
+  headers: {
+    'Content-Type': 'application/json',
+    // Use the API key from environment variables
+    'X-Auth-Token': import.meta.env.THIRD_PARTY_FOOTBALL_API_KEY
+  },
+  timeout: 10000 // 10 second timeout
+});
+
+// Error handling for football API
+footballApiClient.interceptors.response.use(
+  (response: AxiosResponse): AxiosResponse => {
+    return response;
+  },
+  (error: any): Promise<any> => {
+    // Log detailed error information
+    console.error('Football API Error:', error.response?.data || error.message);
+    
+    // Handle common errors
+    if (error.message && error.message.includes('Network Error')) {
+      console.error(`
+        CORS ERROR DETECTED: The football-data.org API has CORS restrictions.
+        
+        Possible solutions:
+        1. Use a backend proxy server to make API requests
+        2. Try a browser extension that disables CORS for development
+        3. Make sure your API key is valid
+        
+        For more information, see: https://www.football-data.org/documentation/quickstart
+      `);
+    }
+    
+    if (error.response && error.response.status === 403) {
+      console.error(`
+        API KEY ERROR: Your API key was rejected by football-data.org
+        
+        Make sure:
+        1. You have a valid API key in your .env file
+        2. Your VITE_THIRD_PARTY_FOOTBALL_API_KEY environment variable is set correctly
+        3. Your API subscription is active
+        
+        For more information, see: https://www.football-data.org/documentation/quickstart
+      `);
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
+// --- Football Data API Calls ---
+
+/**
+ * Fetches top scorers for a competition from football-data.org
+ * @param competitionCode - Competition code (e.g., 'PL' for Premier League)
+ * @param limit - Number of top scorers to retrieve (default: 7)
+ * @returns Promise containing the top scorers data
+ */
+export const getTopScorers = (competitionCode: string, limit: number = 7): Promise<TopScorersResponse> => {
+  return footballApiClient.get<TopScorersResponse>(`/competitions/${competitionCode}/scorers?limit=${limit}`)
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Failed to fetch top scorers for ${competitionCode}:`, error);
+      // Return empty result structure on error
+      return {
+        count: 0,
+        scorers: []
+      };
+    });
+};
+
+/**
+ * Fetches details for a specific player from football-data.org
+ * @param playerId - ID of the player
+ * @returns Promise containing the player details
+ */
+export const getPlayerDetails = (playerId: number): Promise<FootballPlayer> => {
+  return footballApiClient.get<FootballPlayer>(`/persons/${playerId}`)
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Failed to fetch player details for ID ${playerId}:`, error);
+      throw error;
+    });
+};
+
+/**
+ * Fetches details for a specific team from football-data.org
+ * @param teamId - ID of the team
+ * @returns Promise containing the team details
+ */
+export const getTeamDetails = (teamId: number): Promise<FootballTeam> => {
+  return footballApiClient.get<FootballTeam>(`/teams/${teamId}`)
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Failed to fetch team details for ID ${teamId}:`, error);
+      throw error;
+    });
+};
+
 export default apiClient; // Export the configured instance if needed elsewhere
+
+// Also export the football API client for direct use if needed
+export { footballApiClient };

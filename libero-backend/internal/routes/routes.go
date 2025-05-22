@@ -24,10 +24,11 @@ func SetupRoutes(router *mux.Router, service *service.Service, cfg *config.Confi
 	// API routes
 	api := router.PathPrefix("/api").Subrouter()
 
-	// Public routes (no authentication required)
-	api.HandleFunc("/health", healthCheck).Methods(http.MethodGet)
+	// Auth routes
 	api.HandleFunc("/auth/register", ctrl.User.Register).Methods(http.MethodPost) // Changed path prefix
 	api.HandleFunc("/auth/login", ctrl.User.Login).Methods(http.MethodPost)       // Changed path prefix
+	api.HandleFunc("/auth/password/reset-request", ctrl.User.RequestPasswordReset).Methods(http.MethodPost)
+	api.HandleFunc("/auth/password/reset", ctrl.User.ResetPassword).Methods(http.MethodPost)
 
 	// NEW: Public Sports Data routes
 	api.HandleFunc("/matches/upcoming", ctrl.SportsData.HandleGetUpcomingMatches).Methods(http.MethodGet)
@@ -52,20 +53,6 @@ func SetupRoutes(router *mux.Router, service *service.Service, cfg *config.Confi
 	// User routes (Profile & Preferences)
 	protected.HandleFunc("/users/profile", ctrl.User.GetUserProfile).Methods(http.MethodGet)            // Get profile with preferences
 	protected.HandleFunc("/users/preferences", ctrl.User.UpdateUserPreferences).Methods(http.MethodPut) // Update preferences
-
-	// Admin routes (requires admin role)
-	admin := api.PathPrefix("/admin").Subrouter()
-	admin.Use(middleware.AuthMiddleware(authService)) // Inject AuthService
-	admin.Use(middleware.RoleMiddleware("admin"))     // Example role check
-
-	admin.HandleFunc("/users", ctrl.User.ListUsers).Methods(http.MethodGet)
-	admin.HandleFunc("/users/{id:[0-9]+}", ctrl.User.GetUser).Methods(http.MethodGet)
-	admin.HandleFunc("/users/{id:[0-9]+}", ctrl.User.DeleteUser).Methods(http.MethodDelete)
-}
-
-// healthCheck is a simple health check endpoint
-func healthCheck(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"ok"}`))
+	// Password change route (requires authentication)
+	protected.HandleFunc("/auth/password/change", ctrl.User.ChangePassword).Methods(http.MethodPost)
 }

@@ -2,13 +2,15 @@ package models
 
 import "time"
 
-// Team represents a sports team.
+// Team represents a sports team
 type Team struct {
-	ID   uint   `gorm:"primaryKey"`
-	Name string `gorm:"unique;not null"`
-	// TODO: Add other relevant fields like sport, league, external_api_id etc. based on future needs.
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	Name      string    `gorm:"not null" json:"name"`
+	LogoURL   string    `json:"logo_url,omitempty"`
+	Country   string    `json:"country,omitempty"`
+	Sport     string    `json:"sport,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	// Relationships
 	FollowedByUsers []*User `gorm:"many2many:user_followed_teams;"` // Users who follow this team

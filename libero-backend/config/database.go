@@ -39,8 +39,13 @@ func InitDB(config *Config) *gorm.DB {
 
 // migrateDB automatically migrates the database schema
 func migrateDB(db *gorm.DB) {
+	// Make sure to run auto-migration for Team, Player, and Competition models
+	// which are required for user preferences
 	err := db.AutoMigrate(
 		&models.User{},
+		&models.Team{},
+		&models.Player{},
+		&models.Competition{},
 		&models.CachedFixtures{},
 		&models.CachedTodayFixtures{},
 		// Add more models here as needed

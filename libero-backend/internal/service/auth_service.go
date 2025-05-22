@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"libero-backend/config" // Added for JWT config
@@ -17,6 +19,12 @@ var (
 	ErrUserNotFound       = errors.New("user not found") // Potentially replace with specific repo error check
 	ErrTokenInvalid       = errors.New("invalid or expired token")
 	ErrAccountInactive    = errors.New("user account is inactive")
+	ErrPasswordMismatch   = errors.New("new password doesn't match confirmation")
+	ErrSamePassword       = errors.New("new password cannot be the same as the current password")
+	ErrWeakPassword       = errors.New("password does not meet security requirements")
+	ErrEmailAlreadyExists = errors.New("email address already in use")
+	ErrUsernameAlreadyExists = errors.New("username already in use") 
+	ErrResetTokenInvalid  = errors.New("reset token is invalid or has expired")
 )
 
 
@@ -29,11 +37,18 @@ type AuthService interface {
 	// Added methods for password login and JWT validation
 	LoginByPassword(ctx context.Context, email, password string) (string, error)
 	ValidateJWTToken(tokenString string) (*JWTClaims, error)
-	// TODO: Add methods for registration (e.g., RegisterByPassword) (Is this covered by UserService?)
-	// TODO: Add methods for password management (e.g., ChangePassword, RequestPasswordReset)
+	
+	// Password registration
+	RegisterByPassword(ctx context.Context, user *models.User) error
+	
+	// Password management
+	ChangePassword(ctx context.Context, userID uint, currentPassword, newPassword, confirmPassword string) error
+	RequestPasswordReset(ctx context.Context, email string) (string, error)
+	ResetPassword(ctx context.Context, token, newPassword, confirmPassword string) error
 }
 
 // JWTClaims defines the structure for custom JWT claims
+// Exported for use by middleware
 type JWTClaims struct {
 	UserID uint   `json:"user_id"`
 	Email  string `json:"email"`
@@ -252,6 +267,145 @@ func (s *authService) ValidateJWTToken(tokenString string) (*JWTClaims, error) {
 
 	// We can trust claims now
 	return claims, nil
+}
+
+// RegisterByPassword registers a new user with email and password
+func (s *authService) RegisterByPassword(ctx context.Context, user *models.User) error {
+	// Check if email already exists
+	existingUser, err := s.userService.FindUserByEmail(ctx, user.Email)
+	if err == nil && existingUser != nil {
+		return ErrEmailAlreadyExists
+	}
+	
+	// Check if username already exists
+	if user.Username != "" {
+		existingUser, err = s.userService.FindUserByUsername(ctx, user.Username)
+		if err == nil && existingUser != nil {
+			return ErrUsernameAlreadyExists
+		}
+	}
+	
+	// Validate password strength (implement your own criteria)
+	if len(user.Password) < 8 {
+		return ErrWeakPassword
+	}
+	
+	// Set default values
+	user.Role = "user"
+	user.Active = true
+	
+	// Create user (password will be hashed by BeforeSave hook in User model)
+	_, err = s.userService.CreateUser(ctx, user)
+	if err != nil {
+		return fmt.Errorf("failed to create user: %w", err)
+	}
+	
+	return nil
+}
+
+// ChangePassword changes the password for an authenticated user
+func (s *authService) ChangePassword(ctx context.Context, userID uint, currentPassword, newPassword, confirmPassword string) error {
+	// Check if new password and confirmation match
+	if newPassword != confirmPassword {
+		return ErrPasswordMismatch
+	}
+	
+	// Check password strength
+	if len(newPassword) < 8 {
+		return ErrWeakPassword
+	}
+	
+	// Get current user
+	user, err := s.userService.GetUserByID(userID)
+	if err != nil {
+		return ErrUserNotFound
+	}
+	
+	// Verify current password
+	if !user.ComparePassword(currentPassword) {
+		return ErrInvalidCredentials
+	}
+	
+	// Check if new password is different from old password
+	if user.ComparePassword(newPassword) {
+		return ErrSamePassword
+	}
+	
+	// Update password
+	user.Password = newPassword
+	return s.userService.UpdateUser(ctx, user)
+}
+
+// generateResetToken creates a secure random token
+func generateResetToken() (string, error) {
+	b := make([]byte, 32)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	
+	return base64.URLEncoding.EncodeToString(b), nil
+}
+
+// RequestPasswordReset sends a password reset token for a user
+func (s *authService) RequestPasswordReset(ctx context.Context, email string) (string, error) {
+	// Find user by email
+	user, err := s.userService.FindUserByEmail(ctx, email)
+	if err != nil {
+		// Don't reveal if email exists or not for security reasons
+		return "", nil
+	}
+	
+	// Generate reset token
+	resetToken, err := generateResetToken()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate reset token: %w", err)
+	}
+	
+	// Set reset token and expiration time (1 hour)
+	expiresAt := time.Now().Add(1 * time.Hour)
+	
+	// Store token in user record
+	user.ResetToken = resetToken
+	user.ResetTokenExpiresAt = expiresAt
+	err = s.userService.UpdateUser(ctx, user)
+	if err != nil {
+		return "", fmt.Errorf("failed to store reset token: %w", err)
+	}
+	
+	// In production, you would send this token via email instead of returning it
+	// For testing purposes, we're returning the token
+	return resetToken, nil
+}
+
+// ResetPassword resets a user's password using a valid token
+func (s *authService) ResetPassword(ctx context.Context, token, newPassword, confirmPassword string) error {
+	// Check if new password and confirmation match
+	if newPassword != confirmPassword {
+		return ErrPasswordMismatch
+	}
+	
+	// Check password strength
+	if len(newPassword) < 8 {
+		return ErrWeakPassword
+	}
+	
+	// Find user by reset token
+	user, err := s.userService.FindUserByResetToken(ctx, token)
+	if err != nil {
+		return ErrResetTokenInvalid
+	}
+	
+	// Check if token is expired
+	if user.ResetTokenExpiresAt.Before(time.Now()) {
+		return ErrResetTokenInvalid
+	}
+	
+	// Update password and clear reset token fields
+	user.Password = newPassword
+	user.ResetToken = ""
+	user.ResetTokenExpiresAt = time.Time{}
+	return s.userService.UpdateUser(ctx, user)
 }
 
 // Add other AuthService method implementations here...
