@@ -1,37 +1,62 @@
 <!-- src/leagues/components/LeagueTable.vue -->
 <template>
   <div class="league-table-section p-4">
-    <h2 class="text-xl font-semibold mb-3" :style="{ color: themeColor }">League Table</h2>
-    <div class="overflow-x-auto shadow rounded">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-          <tr>
-            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-8">Pos</th>
-            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team</th>
-            <th scope="col" class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">P</th>
-            <th scope="col" class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">W</th>
-            <th scope="col" class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">D</th>
-            <th scope="col" class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">L</th>
-            <th scope="col" class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">GD</th>
-            <th scope="col" class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Pts</th>
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-bold" :style="{ color: themeColor }">League Table</h2>
+      <div v-if="isLoading" class="text-sm text-gray-500">Refreshing...</div>
+    </div>
+
+    <div v-if="error" class="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
+      <p class="text-red-700">{{ error }}</p>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full bg-white">
+        <thead>
+          <tr class="text-sm border-b">
+            <th class="text-left p-3">#</th>
+            <th class="text-left p-3">Team</th>
+            <th class="text-center p-3">MP</th>
+            <th class="text-center p-3">W</th>
+            <th class="text-center p-3">D</th>
+            <th class="text-center p-3">L</th>
+            <th class="text-center p-3">GD</th>
+            <th class="text-center p-3">PTS</th>
           </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-if="!tableData || tableData.length === 0">
-            <td colspan="8" class="px-4 py-3 text-center text-sm text-gray-500 italic">No table data available.</td>
-          </tr>
-          <tr v-for="row in tableData" :key="row.team.id" class="odd:bg-white even:bg-gray-50 hover:bg-gray-100">
-            <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 text-center">{{ row.position }}</td>
-            <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 flex items-center space-x-2">
-               <img :src="row.team.logo" :alt="row.team.name" class="h-5 w-5 object-contain">
-               <span>{{ row.team.name }}</span>
+        <tbody>
+          <template v-if="!isLoading && !error && tableData.length > 0">
+            <tr v-for="row in tableData" :key="row.position" class="text-sm border-b hover:bg-gray-50">
+              <td class="p-3">{{ row.position }}</td>
+              <td class="p-3 flex items-center">
+                <img :src="row.team.logo" :alt="row.team.name" class="w-6 h-6 mr-2">
+                {{ row.team.name }}
+              </td>
+              <td class="text-center p-3">{{ row.played }}</td>
+              <td class="text-center p-3">{{ row.won }}</td>
+              <td class="text-center p-3">{{ row.drawn }}</td>
+              <td class="text-center p-3">{{ row.lost }}</td>
+              <td class="text-center p-3">{{ row.goalDifference }}</td>
+              <td class="text-center p-3 font-bold">{{ row.points }}</td>
+            </tr>
+          </template>
+          <tr v-else-if="isLoading">
+            <td colspan="8" class="text-center p-4">
+              <div class="flex justify-center space-x-2">
+                <div class="animate-spin rounded-full h-5 w-5 border-2" :style="{ borderColor: `${themeColor} transparent` }"></div>
+                <span class="text-gray-500">Loading table data...</span>
+              </div>
             </td>
-            <td class="px-2 py-2 whitespace-nowrap text-sm text-gray-500 text-center">{{ row.played }}</td>
-            <td class="px-2 py-2 whitespace-nowrap text-sm text-gray-500 text-center">{{ row.won }}</td>
-            <td class="px-2 py-2 whitespace-nowrap text-sm text-gray-500 text-center">{{ row.drawn }}</td>
-            <td class="px-2 py-2 whitespace-nowrap text-sm text-gray-500 text-center">{{ row.lost }}</td>
-            <td class="px-2 py-2 whitespace-nowrap text-sm text-gray-500 text-center">{{ row.goalDifference }}</td>
-            <td class="px-3 py-2 whitespace-nowrap text-sm font-bold text-gray-900 text-center">{{ row.points }}</td>
+          </tr>
+          <tr v-else-if="error">
+            <td colspan="8" class="text-center p-4 text-gray-500">
+              Unable to load table data
+            </td>
+          </tr>
+          <tr v-else>
+            <td colspan="8" class="text-center p-4 text-gray-500">
+              No table data available
+            </td>
           </tr>
         </tbody>
       </table>
@@ -46,6 +71,8 @@ import type { LeagueTableRow } from "../mockData";
 defineProps<{
   tableData: LeagueTableRow[];
   themeColor: string;
+  isLoading?: boolean;
+  error?: string;
 }>();
 </script>
 
