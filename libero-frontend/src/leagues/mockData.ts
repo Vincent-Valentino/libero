@@ -1,7 +1,7 @@
 // --- Interfaces (Data Structures) ---
 
 interface Team {
-  id: string;
+  id: string | number;
   name: string;
   logo: string; // URL or path
 }

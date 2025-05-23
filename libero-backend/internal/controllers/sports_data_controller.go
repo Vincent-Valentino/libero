@@ -82,6 +82,16 @@ func (c *SportsDataController) HandleGetPlayerStats(w http.ResponseWriter, r *ht
 
 // HandleGetStandings handles requests for league standings
 func (c *SportsDataController) HandleGetStandings(w http.ResponseWriter, r *http.Request) {
+	// Set CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, Authorization")
+
+	// Handle preflight OPTIONS request
+	if r.Method == "OPTIONS" {
+		return
+	}
+
 	competition := strings.ToUpper(r.URL.Query().Get("competition"))
 	if competition == "" {
 		http.Error(w, "competition code is required", http.StatusBadRequest)
@@ -91,7 +101,16 @@ func (c *SportsDataController) HandleGetStandings(w http.ResponseWriter, r *http
 	standings, err := c.footballService.GetStandings(competition)
 	if err != nil {
 		fmt.Printf("Error fetching standings for %s: %v\n", competition, err)
-		http.Error(w, "Failed to retrieve standings data", http.StatusInternalServerError)
+		utils.RespondWithJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "Failed to retrieve standings data",
+		})
+		return
+	}
+
+	if standings == nil {
+		utils.RespondWithJSON(w, http.StatusNotFound, map[string]string{
+			"error": "No standings data found for this competition",
+		})
 		return
 	}
 

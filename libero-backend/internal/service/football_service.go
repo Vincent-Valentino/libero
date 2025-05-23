@@ -40,9 +40,11 @@ func (s *FootballService) GetStandings(competitionCode string) (*models.Competit
 
 	// Set headers
 	req.Header.Set("X-Auth-Token", s.apiKey)
+	req.Header.Set("Accept", "application/json")
 
 	// Perform request
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute standings request: %w", err)
 	}

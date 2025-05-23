@@ -1,5 +1,50 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
 
+// Create axios instance with custom config
+const apiClient: AxiosInstance = axios.create({
+  baseURL: '/api', // uses proxy in vite.config.ts
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  timeout: 10000, // 10 seconds
+});
+
+// Request Interceptor: Add auth token if available
+apiClient.interceptors.request.use(
+  (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error: any): Promise<any> => {
+    console.error('API Request Error:', error);
+    return Promise.reject(error);
+  }
+);
+
+// Response Interceptor: Handle common errors
+apiClient.interceptors.response.use(
+  (response: AxiosResponse): AxiosResponse => {
+    return response;
+  },
+  (error: any): Promise<any> => {
+    if (error.response) {
+      console.error('API Error:', {
+        status: error.response.status,
+        data: error.response.data,
+        url: error.config.url
+      });
+    } else if (error.request) {
+      console.error('API Error: No response received', error.request);
+    } else {
+      console.error('API Error:', error.message);
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Define interfaces for expected data structures
 export interface LoginCredentials { // Add export keyword
   email: string;
@@ -100,7 +145,7 @@ export interface FixturesSummaryDTO {
 export interface LeagueTableRow {
   position: number;
   team: {
-    id: number;
+    id: number | string;
     name: string;
     logo: string;
   };
@@ -108,6 +153,8 @@ export interface LeagueTableRow {
   won: number;
   drawn: number;
   lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
   goalDifference: number;
   points: number;
 }
@@ -125,18 +172,8 @@ export interface PlayerStat {
 }
 
 // Base URL for the backend API
-// TODO: Make this configurable via environment variables (.env)
-// Use relative path for API calls; Vite proxy will handle forwarding
-const API_BASE_URL: string = '/api';
-// Explicit base URL for backend, needed for constructing full OAuth URLs
-const BACKEND_BASE_URL: string = 'http://localhost:8080'; // <-- Added
-
-const apiClient: AxiosInstance = axios.create({
-  baseURL: `${BACKEND_BASE_URL}${API_BASE_URL}`,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+// Backend URLs
+const BACKEND_BASE_URL = 'http://localhost:8080'; // Only used for OAuth
 
 // Request Interceptor: Add JWT token to headers if available
 apiClient.interceptors.request.use(
@@ -270,7 +307,7 @@ export const getTodaysFixtures = (): Promise<CompetitionFixturesDTO[]> => {
  * @returns Promise containing the fixtures summary DTO
  */
 export const getFixturesSummary = (competitionCode: string): Promise<FixturesSummaryDTO> => {
-  return apiClient.get<FixturesSummaryDTO>(`/sports/fixtures/summary?competition=${competitionCode}`)
+  return apiClient.get<FixturesSummaryDTO>(`/api/sports/fixtures/summary?competition=${competitionCode}`)
     .then(response => response.data);
 };
 
@@ -342,13 +379,12 @@ interface BackendCompetitionStandingsDTO { // Previously StandingsResponse
 export const getStandings = async (competitionCode: string): Promise<LeagueTableRow[]> => {
   // Expecting backend to return CompetitionStandingsDTO
   const response = await apiClient.get<BackendCompetitionStandingsDTO>(`/standings?competition=${competitionCode}`);
-
-  // The transformation logic here is to convert BackendCompetitionStandingsDTO.standings
-  // (which is StandingsTableDTO[]) into LeagueTableRow[]
+  
+  // Transform backend data to match frontend interface
   return response.data.standings.map(row => ({
     position: row.position,
     team: {
-      id: 0, // Needs to come from somewhere if required; StandingsTableDTO doesn't have team ID
+      id: String(row.position), // Converting position to string since team.id can be string | number
       name: row.team_name,
       logo: row.team_crest,
     },
@@ -356,7 +392,9 @@ export const getStandings = async (competitionCode: string): Promise<LeagueTable
     won: row.won,
     drawn: row.drawn,
     lost: row.lost,
-    goalDifference: row.goal_difference, // Align with backend DTO field name
+    goalsFor: row.goals_for,
+    goalsAgainst: row.goals_against,
+    goalDifference: row.goal_difference,
     points: row.points,
   }));
 };
@@ -377,7 +415,7 @@ interface ScorersResponse {
 }
 
 export const getTopScorers = async (competitionCode: string): Promise<PlayerStat[]> => {
-  const response = await apiClient.get<ScorersResponse>(`/topscorers?competition=${competitionCode}`);
+  const response = await apiClient.get<ScorersResponse>(`/api/topscorers?competition=${competitionCode}`);
   
   return response.data.scorers.map(scorer => ({
     id: scorer.player.id,
@@ -392,4 +430,4 @@ export const getTopScorers = async (competitionCode: string): Promise<PlayerStat
   }));
 };
 
-export default apiClient; 
+export default apiClient;

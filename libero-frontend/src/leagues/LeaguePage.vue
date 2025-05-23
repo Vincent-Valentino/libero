@@ -1,7 +1,20 @@
 <template>
   <div class="league-page">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <!-- League Header -->
+      <!--// Watch for route changes and load data
+watch(
+  () => route.params.code,
+  async (newCode: string | string[]) => {
+    try {
+      const code = (typeof newCode === 'string' ? newCode : 'PL').toUpperCase();
+      console.log('Loading league data for:', code);
+      await store.fetchAllLeagueData(code);
+    } catch (error: any) {
+      console.error('Error fetching league data:', error);
+      // Error states are handled by the store actions
+    }
+  },
+  { immediate: true });eader -->
       <div class="league-header flex items-center mb-8" v-if="currentLeague">
         <img :src="currentLeague.logo" :alt="currentLeague.name" class="w-16 h-16 mr-4">
         <h1 class="text-3xl font-bold" :style="{ color: currentLeague.themeColor }">{{ currentLeague.name }}</h1>
@@ -70,7 +83,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { computed, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useLeagueStore } from '@/stores/league';
 import LeagueTable from './components/LeagueTable.vue';
@@ -81,7 +94,7 @@ const store = useLeagueStore();
 
 // Get current league metadata based on route params
 const currentLeague = computed(() => {
-  const code = route.params.code as string || 'PL';
+  const code = (route.params.code as string)?.toUpperCase() || 'PL';
   return leagueMetadata[code];
 });
 
@@ -109,9 +122,14 @@ const formatDate = (dateStr: string) => {
   });
 };
 
-// Load data when component mounts
-onMounted(async () => {
-  const competitionCode = (route.params.code as string) || 'PL';
-  await store.fetchAllLeagueData(competitionCode);
-});
+// Watch for route changes and load data
+watch(
+  () => route.params.code,
+  async (newCode) => {
+    if (newCode) {
+      await store.fetchAllLeagueData(newCode as string);
+    }
+  },
+  { immediate: true }
+);
 </script>
