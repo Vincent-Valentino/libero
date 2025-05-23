@@ -17,12 +17,12 @@ type FootballService struct {
 }
 
 func NewFootballService(baseURL, apiKey string) *FootballService {
-	// Initialize with rate limiting (3 requests per second as per provider limits)
+	// Initialize with rate limiting (10 requests per minute as per API limits)
 	return &FootballService{
-		baseURL:     baseURL,
+		baseURL:     strings.TrimSuffix(baseURL, "/"), // Remove trailing slash if present
 		apiKey:      apiKey,
-		rateLimiter: time.NewTicker(time.Second / 3),
-		client:      &http.Client{Timeout: 10 * time.Second},
+		rateLimiter: time.NewTicker(6 * time.Second), // 10 requests per minute = 1 request per 6 seconds
+		client:      &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
@@ -30,14 +30,19 @@ func NewFootballService(baseURL, apiKey string) *FootballService {
 func (s *FootballService) GetStandingsVersion(competitionCode string) (string, error) {
 	<-s.rateLimiter.C
 
-	url := fmt.Sprintf("%s/competitions/%s/standings", strings.TrimRight(s.baseURL, "/"), competitionCode)
+	url := fmt.Sprintf("%s/competitions/%s/standings", s.baseURL, competitionCode)
+
+	// Debug URL (remove in production)
+	fmt.Printf("Fetching standings from: %s\n", url)
+
 	req, err := http.NewRequest("HEAD", url, nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
 	// Set required headers
 	req.Header.Set("X-Auth-Token", s.apiKey)
+	req.Header.Set("Accept", "application/json")
 
 	resp, err := s.client.Do(req)
 	if err != nil {

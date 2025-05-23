@@ -37,7 +37,8 @@ type rateLimiter struct {
 // newRateLimiter creates a new rate limiter with specified interval
 func newRateLimiter(interval time.Duration) *rateLimiter {
 	return &rateLimiter{
-		minInterval: interval,
+		minInterval:     interval,
+		lastRequestTime: time.Now().Add(-interval), // Allow immediate first request
 	}
 }
 
@@ -97,18 +98,29 @@ func (s *fixturesService) GetTodaysFixtures() ([]models.CompetitionFixturesDTO, 
 
 	// Wait for rate limiter before making request
 	s.rateLimiter.Wait()
+	// Build endpoint URL using date parameter
+	url := fmt.Sprintf("%s/matches?dateFrom=%s&dateTo=%s&competitions=%s",
+		s.baseURL,
+		today,
+		today,
+		compParam,
+	)
 
-	// Build endpoint URL using date parameter (v4): returns matches on that date
-	url := fmt.Sprintf("%s/matches?date=%s&competitions=%s", strings.TrimRight(s.baseURL, "/"), today, compParam)
+	// Debug URL (remove in production)
+	fmt.Printf("Fetching matches from: %s\n", url)
+
 	// Create HTTP request
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	// Set API key header (adjust header name per provider)
+
+	// Set required headers
 	req.Header.Set("X-Auth-Token", s.apiKey)
-	// Perform request
-	client := http.Client{Timeout: 10 * time.Second}
+	req.Header.Set("Accept", "application/json")
+
+	// Perform request with proper timeout
+	client := http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err

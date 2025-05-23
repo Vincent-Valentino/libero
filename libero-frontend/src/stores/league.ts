@@ -21,15 +21,25 @@ export const useLeagueStore = defineStore('league', () => {
 
   // Actions
   const fetchStandings = async (competitionCode: string) => {
+    console.log(`Fetching standings for ${competitionCode}...`);
     isLoadingStandings.value = true;
     standingsError.value = '';
     try {
-      standings.value = await getStandings(competitionCode);
-    } catch (error) {
-      standingsError.value = 'Failed to load standings';
-      console.error('Error fetching standings:', error);
+      console.log('Making API call to get standings...');
+      const data = await getStandings(competitionCode);
+      console.log('Received standings data:', data);
+      standings.value = data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to load standings';
+      standingsError.value = errorMessage;
+      console.error('Error fetching standings:', {
+        code: competitionCode,
+        error: error,
+        response: error.response?.data
+      });
     } finally {
       isLoadingStandings.value = false;
+      console.log('Standings fetch complete. HasData:', standings.value.length > 0);
     }
   };
 

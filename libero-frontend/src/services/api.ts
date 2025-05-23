@@ -2,20 +2,26 @@ import axios, { type AxiosInstance, type InternalAxiosRequestConfig, type AxiosR
 
 // Create axios instance with custom config
 const apiClient: AxiosInstance = axios.create({
-  baseURL: '/api', // uses proxy in vite.config.ts
+  baseURL: 'http://localhost:8080/api', // Update to match your backend URL
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000, // 10 seconds
+  timeout: 30000, // Increase timeout to 30 seconds
 });
 
-// Request Interceptor: Add auth token if available
+// Request Interceptor: Add auth token and debugging
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
     const token = localStorage.getItem('authToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    console.log('API Request:', {
+      url: config.url,
+      method: config.method,
+      headers: config.headers,
+      data: config.data
+    });
     return config;
   },
   (error: any): Promise<any> => {
@@ -24,20 +30,29 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response Interceptor: Handle common errors
+// Response Interceptor: Add debugging and handle common errors
 apiClient.interceptors.response.use(
   (response: AxiosResponse): AxiosResponse => {
+    console.log('API Response:', {
+      url: response.config.url,
+      status: response.status,
+      data: response.data
+    });
     return response;
   },
   (error: any): Promise<any> => {
     if (error.response) {
       console.error('API Error:', {
+        url: error.config.url,
         status: error.response.status,
         data: error.response.data,
-        url: error.config.url
+        headers: error.response.headers
       });
     } else if (error.request) {
-      console.error('API Error: No response received', error.request);
+      console.error('API Error: No response received', {
+        url: error.config.url,
+        request: error.request
+      });
     } else {
       console.error('API Error:', error.message);
     }
