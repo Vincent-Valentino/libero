@@ -7,7 +7,7 @@ import (
 	"libero-backend/internal/repository"
 	"libero-backend/internal/service"
 	"libero-backend/internal/utils"
-	"net/http"	
+	"net/http"
 	"strings"
 	"time"
 
@@ -19,13 +19,13 @@ type SportsDataController struct {
 	mlService       service.MLService
 	fixturesService service.FixturesService
 	footballService *service.FootballService
-	cacheRepo      repository.CacheRepository
+	cacheRepo       repository.CacheRepository
 }
 
 // NewSportsDataController creates a new sports data controller instance.
 func NewSportsDataController(
-	mlService service.MLService, 
-	fixturesService service.FixturesService, 
+	mlService service.MLService,
+	fixturesService service.FixturesService,
 	footballService *service.FootballService,
 	cacheRepo repository.CacheRepository,
 ) *SportsDataController {
@@ -33,7 +33,7 @@ func NewSportsDataController(
 		mlService:       mlService,
 		fixturesService: fixturesService,
 		footballService: footballService,
-		cacheRepo:      cacheRepo,
+		cacheRepo:       cacheRepo,
 	}
 }
 
@@ -133,15 +133,15 @@ func (c *SportsDataController) HandleGetStandings(w http.ResponseWriter, r *http
 
 	// Generate new ETag for fresh data
 	newETag := fmt.Sprintf("%d", time.Now().UnixNano())
-	
+
 	// Cache the fresh results for 1 hour
 	if standingsJSON, err := json.Marshal(standings); err == nil {
 		cacheItem := models.CacheItem{
-			Key:         cacheKey,
-			Value:       standingsJSON,
-			ETag:        newETag,
+			Key:          cacheKey,
+			Value:        standingsJSON,
+			ETag:         newETag,
 			LastModified: time.Now(),
-			ExpiresAt:   time.Now().Add(1 * time.Hour),
+			ExpiresAt:    time.Now().Add(1 * time.Hour),
 		}
 		if err := c.cacheRepo.SetWithMetadata(cacheKey, cacheItem); err != nil {
 			fmt.Printf("Error caching standings for %s: %v\n", competition, err)
@@ -194,7 +194,7 @@ func (c *SportsDataController) HandleGetTopScorers(w http.ResponseWriter, r *htt
 
 	// Generate new ETag for fresh data
 	newETag := fmt.Sprintf("%d", time.Now().UnixNano())
-	
+
 	// Cache the results for 1 hour
 	if scorersJSON, err := json.Marshal(scorers); err == nil {
 		cacheItem := models.CacheItem{
@@ -218,57 +218,57 @@ func (c *SportsDataController) HandleGetTopScorers(w http.ResponseWriter, r *htt
 
 // HandleGetTodaysFixtures handles requests for today's fixtures.
 func (c *SportsDataController) HandleGetTodaysFixtures(w http.ResponseWriter, r *http.Request) {
-    // Try to get from cache first
-    cacheKey := fmt.Sprintf("todays_fixtures_%s", time.Now().Format("2006-01-02"))
-    if cachedItem, err := c.cacheRepo.Get(cacheKey); err == nil && cachedItem != nil {
-        // Check if client's cached version is still valid
-        if clientETag := r.Header.Get("If-None-Match"); clientETag != "" && clientETag == cachedItem.ETag {
-            w.WriteHeader(http.StatusNotModified)
-            return
-        }
+	// Try to get from cache first
+	cacheKey := fmt.Sprintf("todays_fixtures_%s", time.Now().Format("2006-01-02"))
+	if cachedItem, err := c.cacheRepo.Get(cacheKey); err == nil && cachedItem != nil {
+		// Check if client's cached version is still valid
+		if clientETag := r.Header.Get("If-None-Match"); clientETag != "" && clientETag == cachedItem.ETag {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
 
-        // Return cached data if it's not expired
-        if cachedItem.ExpiresAt.After(time.Now()) {
-            var fixtures interface{}
-            if err := json.Unmarshal(cachedItem.Value, &fixtures); err == nil {
-                w.Header().Set("ETag", cachedItem.ETag)
-                w.Header().Set("Last-Modified", cachedItem.LastModified.Format(http.TimeFormat))
-                utils.RespondWithJSON(w, http.StatusOK, fixtures)
-                return
-            }
-        }
-    }
+		// Return cached data if it's not expired
+		if cachedItem.ExpiresAt.After(time.Now()) {
+			var fixtures interface{}
+			if err := json.Unmarshal(cachedItem.Value, &fixtures); err == nil {
+				w.Header().Set("ETag", cachedItem.ETag)
+				w.Header().Set("Last-Modified", cachedItem.LastModified.Format(http.TimeFormat))
+				utils.RespondWithJSON(w, http.StatusOK, fixtures)
+				return
+			}
+		}
+	}
 
-    // If not in cache or cache error, fetch from service
-    fixtures, err := c.fixturesService.GetTodaysFixtures()
-    if err != nil {
-        fmt.Printf("Error fetching today's fixtures: %v\n", err)
-        http.Error(w, "Failed to retrieve today's fixtures", http.StatusInternalServerError)
-        return
-    }
+	// If not in cache or cache error, fetch from service
+	fixtures, err := c.fixturesService.GetTodaysFixtures()
+	if err != nil {
+		fmt.Printf("Error fetching today's fixtures: %v\n", err)
+		http.Error(w, "Failed to retrieve today's fixtures", http.StatusInternalServerError)
+		return
+	}
 
-    // Generate new ETag for fresh data
-    newETag := fmt.Sprintf("%d", time.Now().UnixNano())
-    
-    // Cache the results for 15 minutes
-    if fixturesJSON, err := json.Marshal(fixtures); err == nil {
-        cacheItem := models.CacheItem{
-            Key:          cacheKey,
-            Value:        fixturesJSON,
-            ETag:         newETag,
-            LastModified: time.Now(),
-            ExpiresAt:    time.Now().Add(15 * time.Minute),
-        }
-        if err := c.cacheRepo.SetWithMetadata(cacheKey, cacheItem); err != nil {
-            fmt.Printf("Error caching today's fixtures: %v\n", err)
-            // Continue despite cache error
-        }
-    }
+	// Generate new ETag for fresh data
+	newETag := fmt.Sprintf("%d", time.Now().UnixNano())
 
-    // Set fresh data headers
-    w.Header().Set("ETag", newETag)
-    w.Header().Set("Last-Modified", time.Now().Format(http.TimeFormat))
-    utils.RespondWithJSON(w, http.StatusOK, fixtures)
+	// Cache the results for 15 minutes
+	if fixturesJSON, err := json.Marshal(fixtures); err == nil {
+		cacheItem := models.CacheItem{
+			Key:          cacheKey,
+			Value:        fixturesJSON,
+			ETag:         newETag,
+			LastModified: time.Now(),
+			ExpiresAt:    time.Now().Add(15 * time.Minute),
+		}
+		if err := c.cacheRepo.SetWithMetadata(cacheKey, cacheItem); err != nil {
+			fmt.Printf("Error caching today's fixtures: %v\n", err)
+			// Continue despite cache error
+		}
+	}
+
+	// Set fresh data headers
+	w.Header().Set("ETag", newETag)
+	w.Header().Set("Last-Modified", time.Now().Format(http.TimeFormat))
+	utils.RespondWithJSON(w, http.StatusOK, fixtures)
 }
 
 // HandleGetFixturesSummary handles requests for fixtures summary
@@ -308,7 +308,7 @@ func (c *SportsDataController) HandleGetFixturesSummary(w http.ResponseWriter, r
 
 	// Generate new ETag for fresh data
 	newETag := fmt.Sprintf("%d", time.Now().UnixNano())
-	
+
 	// Cache the results for 30 minutes
 	if summaryJSON, err := json.Marshal(summary); err == nil {
 		cacheItem := models.CacheItem{
