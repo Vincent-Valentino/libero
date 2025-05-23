@@ -13,6 +13,7 @@ type FootballService struct {
 	baseURL     string
 	apiKey      string
 	rateLimiter *time.Ticker
+	client      *http.Client
 }
 
 func NewFootballService(baseURL, apiKey string) *FootballService {
@@ -21,7 +22,43 @@ func NewFootballService(baseURL, apiKey string) *FootballService {
 		baseURL:     baseURL,
 		apiKey:      apiKey,
 		rateLimiter: time.NewTicker(time.Second / 3),
+		client:      &http.Client{Timeout: 10 * time.Second},
 	}
+}
+
+// GetStandingsVersion gets the latest version/etag of standings data
+func (s *FootballService) GetStandingsVersion(competitionCode string) (string, error) {
+	<-s.rateLimiter.C
+
+	url := fmt.Sprintf("%s/competitions/%s/standings", strings.TrimRight(s.baseURL, "/"), competitionCode)
+	req, err := http.NewRequest("HEAD", url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	// Set required headers
+	req.Header.Set("X-Auth-Token", s.apiKey)
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	// Check for ETag header
+	etag := resp.Header.Get("ETag")
+	if etag != "" {
+		return etag, nil
+	}
+
+	// Fallback to Last-Modified if no ETag
+	lastMod := resp.Header.Get("Last-Modified")
+	if lastMod != "" {
+		return lastMod, nil
+	}
+
+	// If no version info available, return current timestamp
+	return fmt.Sprintf("%d", time.Now().Unix()), nil
 }
 
 // GetStandings retrieves the current standings for a competition
@@ -31,20 +68,18 @@ func (s *FootballService) GetStandings(competitionCode string) (*models.Competit
 
 	// Build URL for standings endpoint
 	url := fmt.Sprintf("%s/competitions/%s/standings", strings.TrimRight(s.baseURL, "/"), competitionCode)
-
-	// Create request
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create standings request: %w", err)
+		return nil, err
 	}
 
+	// Set required headers
+	req.Header.Set("X-Auth-Token", s.apiKey)
 	// Set headers
 	req.Header.Set("X-Auth-Token", s.apiKey)
-	req.Header.Set("Accept", "application/json")
 
 	// Perform request
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute standings request: %w", err)
 	}
@@ -177,3 +212,5 @@ func (s *FootballService) GetTopScorers(competitionCode string) (*models.Competi
 
 	return result, nil
 }
+
+// End of file

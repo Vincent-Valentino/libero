@@ -26,6 +26,7 @@ func SetupRoutes(router *mux.Router, service *service.Service, cfg *config.Confi
 	// Add global middlewares
 	router.Use(middleware.LoggingMiddleware)
 	router.Use(middleware.CORSMiddleware)
+	router.Use(middleware.JSONMiddleware)
 
 	// API routes
 	api := router.PathPrefix("/api").Subrouter()
