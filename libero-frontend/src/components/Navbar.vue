@@ -7,13 +7,13 @@
       <!-- Desktop Navigation -->
       <div class="hidden md:flex gap-8 font-roboto-condensed">
         <router-link to="/" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Home</router-link>
-        <router-link to="/premier-league" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Premier League</router-link>
-        <router-link to="/la-liga" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">La Liga</router-link>
-        <router-link to="/serie-a" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Serie A</router-link>
-        <router-link to="/bundesliga" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Bundesliga</router-link>
-        <router-link to="/ligue-1" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Ligue 1</router-link>
-        <router-link to="/ucl" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">UCL</router-link>
-        <router-link to="/uel" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">UEL</router-link>
+        <router-link to="/leagues/PL" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Premier League</router-link>
+        <router-link to="/leagues/PD" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">La Liga</router-link>
+        <router-link to="/leagues/SA" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Serie A</router-link>
+        <router-link to="/leagues/BL1" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Bundesliga</router-link>
+        <router-link to="/leagues/FL1" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Ligue 1</router-link>
+        <router-link to="/leagues/CL" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">UCL</router-link>
+        <router-link to="/leagues/EL" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">UEL</router-link>
         <router-link to="/player" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Player</router-link>
         <router-link to="/team" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Team</router-link>
         <router-link to="/nations" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Nations</router-link>
@@ -61,13 +61,13 @@
         class="fixed top-0 right-0 h-full w-64 bg-white shadow-lg z-20" >
         <div class="p-6 flex flex-col gap-3">
           <router-link @click="closeMenu" to="/" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">Home</router-link>
-          <router-link @click="closeMenu" to="/premier-league" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">Premier League</router-link>
-          <router-link @click="closeMenu" to="/la-liga" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">La Liga</router-link>
-          <router-link @click="closeMenu" to="/serie-a" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">Serie A</router-link>
-          <router-link @click="closeMenu" to="/bundesliga" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">Bundesliga</router-link>
-          <router-link @click="closeMenu" to="/ligue-1" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">Ligue 1</router-link>
-          <router-link @click="closeMenu" to="/ucl" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">UCL</router-link>
-          <router-link @click="closeMenu" to="/uel" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">UEL</router-link>
+          <router-link @click="closeMenu" to="/leagues/PL" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">Premier League</router-link>
+          <router-link @click="closeMenu" to="/leagues/PD" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">La Liga</router-link>
+          <router-link @click="closeMenu" to="/leagues/SA" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">Serie A</router-link>
+          <router-link @click="closeMenu" to="/leagues/BL1" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">Bundesliga</router-link>
+          <router-link @click="closeMenu" to="/leagues/FL1" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">Ligue 1</router-link>
+          <router-link @click="closeMenu" to="/leagues/CL" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">UCL</router-link>
+          <router-link @click="closeMenu" to="/leagues/EL" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">UEL</router-link>
           <router-link @click="closeMenu" to="/player" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">Player</router-link>
           <router-link @click="closeMenu" to="/team" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">Team</router-link>
           <router-link @click="closeMenu" to="/nations" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">Nations</router-link>

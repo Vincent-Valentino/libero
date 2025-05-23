@@ -33,12 +33,8 @@ const routes: Array<RouteRecordRaw> = [ // Added type annotation
   { path: '/auth/callback', name: 'AuthCallback', component: AuthCallback }, // Handles OAuth redirect
   // Protected routes
   // Existing routes (assuming public for now, add meta: { requiresAuth: true } if needed)
-  // Use LeaguePage for the top 5 leaguesx`
-  { path: '/premier-league', name: 'PremierLeague', component: LeaguePage },
-  { path: '/la-liga', name: 'LaLiga', component: LeaguePage },
-  { path: '/serie-a', name: 'SerieA', component: LeaguePage },
-  { path: '/bundesliga', name: 'Bundesliga', component: LeaguePage },
-  { path: '/ligue-1', name: 'Ligue1', component: LeaguePage },
+  // Use a single dynamic route for all leagues
+  { path: '/leagues/:code', name: 'LeaguePage', component: LeaguePage },
   // Keep placeholders for others
   { path: '/ucl', name: 'UCL', component: UCL },
   { path: '/uel', name: 'UEL', component: UEL },

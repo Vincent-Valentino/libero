@@ -112,8 +112,58 @@ watch(selectedTab, (code) => {
   }
 });
 
+// --- MOCK DATA FALLBACKS ---
+const mockAllLeagues = [
+  {
+    competition_name: 'Premier League',
+    logo_url: '/Premier League.svg',
+    matches: [
+      {
+        match_date: '2025-05-25T16:00:00Z',
+        home_team_name: 'Liverpool FC',
+        away_team_name: 'Arsenal FC',
+        home_logo_url: '/Liverpool FC.png',
+        away_logo_url: '/Arsenal FC.png',
+        home_score: null,
+        away_score: null,
+        venue: 'Anfield',
+      },
+      {
+        match_date: '2025-05-26T18:30:00Z',
+        home_team_name: 'Manchester City FC',
+        away_team_name: 'Chelsea FC',
+        home_logo_url: '/Manchester City FC.png',
+        away_logo_url: '/Chelsea FC.png',
+        home_score: null,
+        away_score: null,
+        venue: 'Etihad Stadium',
+      },
+    ],
+  },
+  {
+    competition_name: 'La Liga',
+    logo_url: '/LaLiga.svg',
+    matches: [
+      {
+        match_date: '2025-05-27T20:00:00Z',
+        home_team_name: 'Real Madrid',
+        away_team_name: 'Barcelona',
+        home_logo_url: '/Real Madrid.png',
+        away_logo_url: '/Barcelona.png',
+        home_score: null,
+        away_score: null,
+        venue: 'Santiago Bernabéu',
+      },
+    ],
+  },
+];
+
 // Compute sections for display
 const displayLeagues = computed(() => {
+  // Use mock data if error or no data
+  if (error.value || allLeagues.value.length === 0) {
+    return mockAllLeagues;
+  }
   if (selectedTab.value === 'all') {
     // Show each league's today's fixtures
     return allLeagues.value

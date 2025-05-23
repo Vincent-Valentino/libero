@@ -3,7 +3,7 @@
     <div v-if="loading" class="col-span-full text-center">
       Loading player data...
     </div>
-    <div v-else-if="error" class="col-span-full text-center text-red-500">
+    <div v-else-if="error && players.length === 0" class="col-span-full text-center text-red-500">
       {{ error }}
     </div>
     <PlayerCard
@@ -208,38 +208,32 @@ const fetchLiveData = async () => {
   try {
     loading.value = true;
     error.value = '';
-    
     // Use our API service to get top scorers from Premier League
     const data = await getTopScorers('PL');
-    
-    if (data.scorers && data.scorers.length > 0) {
+    if (Array.isArray(data) && data.length > 0) {
       // Transform the API data to match our interface
-      players.value = data.scorers.map(scorer => {
+      players.value = data.map((scorer: any) => {
         // Format image path - either use photo from API or fallback to local image
-        const imagePath = scorer.player.photo || 
-          `/players/${scorer.player.name.replace(/\s+/g, '')}.png`;
-        
+        const imagePath = scorer.photo || `/players/${scorer.name.replace(/\s+/g, '')}.png`;
         // Calculate age from birthdate if available
-        const age = scorer.player.dateOfBirth 
-          ? calculateAge(scorer.player.dateOfBirth) 
+        const age = scorer.dateOfBirth 
+          ? calculateAge(scorer.dateOfBirth) 
           : Math.floor(Math.random() * 15) + 20; // Random age between 20-35 if not available
-          
         return {
-          name: scorer.player.name,
+          name: scorer.name,
           imagePath: imagePath,
           age: age,
-          position: scorer.player.position || 'Forward',
-          team: scorer.team.name,
-          nationality: scorer.player.nationality || 'Unknown',
+          position: scorer.position || 'Forward',
+          team: scorer.team?.name || 'Unknown',
+          nationality: scorer.nationality || 'Unknown',
           stats: {
             appearances: scorer.playedMatches || 0,
-            goals: scorer.goals || 0,
+            goals: scorer.value || 0,
             assists: scorer.assists || 0,
-            // Generate random but reasonable values for stats not provided by API
             keyPasses: Math.floor(Math.random() * 30) + 15,
             dribblesPerGame: parseFloat((Math.random() * 3 + 1).toFixed(1)),
             aerialPercentage: Math.floor(Math.random() * 60) + 20,
-            xG: parseFloat((scorer.goals * 0.8 + Math.random() * 2).toFixed(1)),
+            xG: parseFloat(((scorer.value || 0) * 0.8 + Math.random() * 2).toFixed(1)),
             xA: parseFloat(((scorer.assists || 0) * 0.9 + Math.random() * 1.5).toFixed(1))
           }
         };
@@ -248,16 +242,13 @@ const fetchLiveData = async () => {
       // If no scorers were returned, fall back to our static data
       throw new Error('No player data returned from API');
     }
-    
   } catch (err: any) {
     console.error('Error fetching player data:', err);
-    
     if (err.message && err.message.includes('Network Error')) {
       error.value = 'CORS error with football API. Using local data instead.';
     } else {
       error.value = 'Could not load live player data. Using fallback data.';
     }
-    
     // Ensure we're using the fallback data
     players.value = [...fallbackPlayers];
   } finally {
