@@ -9,11 +9,11 @@
         v-for="category in categories"
         :key="category.key"
         @click="selectedCategory = category.key"
-        :class="[
-          'py-2 px-4 text-sm font-medium focus:outline-none', // Base classes
+        :class="[ 
+          'py-2 px-4 text-sm font-medium focus:outline-none',
           selectedCategory === category.key
-            ? 'border-b-2 font-semibold' // Active classes
-            : 'text-gray-600 hover:text-gray-800', // Inactive classes
+            ? 'border-b-2 font-semibold'
+            : 'text-gray-600 hover:text-gray-800'
         ]"
         :style="{
           borderBottomColor: selectedCategory === category.key ? themeColor : 'transparent',
@@ -26,44 +26,49 @@
 
     <!-- Player List for Selected Category -->
     <div v-if="selectedPlayers.length > 0" class="space-y-2">
-       <div v-for="(player, index) in selectedPlayers" :key="player.id" class="flex items-center justify-between p-3 bg-gray-50 rounded">
-         <div class="flex items-center space-x-3">
-           <span class="font-semibold text-gray-500 w-5 text-right">{{ index + 1 }}.</span>
-           <img
-             :src="imgSrc(player.photo)"
-             :alt="player.name"
-             class="h-8 w-8 rounded-full object-cover border"
-             @error="onImgError($event, player)"
-           >
-           <div>
-             <div class="font-medium text-sm">{{ player.name }}</div>
-             <div class="text-xs text-gray-500">{{ player.team.name }}</div>
-           </div>
-         </div>
-         <div class="font-bold text-lg" :style="{ color: themeColor }">{{ player.value }}</div>
-       </div>
+      <div
+        v-for="(player, index) in selectedPlayers"
+        :key="player.id"
+        class="flex items-center justify-between p-3 bg-gray-50 rounded"
+      >
+        <div class="flex items-center space-x-3">
+          <span class="font-semibold text-gray-500 w-5 text-right">{{ index + 1 }}.</span>
+          <img
+            v-if="player.photo"
+            loading="lazy"
+            :src="player.photo"
+            :alt="player.name"
+            class="h-8 w-8 rounded-full object-cover border"
+          >
+          <div>
+            <div class="font-medium text-sm">{{ player.name }}</div>
+            <div class="text-xs text-gray-500">{{ player.team.name }}</div>
+          </div>
+        </div>
+        <div class="font-bold text-lg" :style="{ color: themeColor }">{{ player.value }}</div>
+      </div>
     </div>
-     <div v-else class="text-gray-500 italic p-2">
-        No player data available for this category.
+
+    <div v-else class="text-gray-500 italic p-2">
+      No player data available for this category.
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, defineProps } from 'vue';
-import type { PlayerStat } from '../mockData'; // Correct path assumed
+import type { PlayerStat } from '../mockData'; // Update if needed
 
-// Define categories with explicit types and 'as const' for type safety
+// Define categories
 const categories = [
   { key: 'topScorers' as const, label: 'Top Scorers' },
   { key: 'topAssists' as const, label: 'Top Assists' },
   { key: 'mostCleanSheets' as const, label: 'Most Clean Sheets' },
 ];
 
-// Derive the CategoryKey type from the categories array
 type CategoryKey = typeof categories[number]['key'];
 
-// Define props
+// Props
 const props = defineProps<{
   topScorers: PlayerStat[];
   topAssists: PlayerStat[];
@@ -71,48 +76,28 @@ const props = defineProps<{
   themeColor: string;
 }>();
 
-// State for the selected category
-const selectedCategory = ref<CategoryKey>(categories[0].key); // Default to the key of the first category
+// State
+const selectedCategory = ref<CategoryKey>('topScorers');
 
-// Computed property to get the players for the selected category
+// Dynamic selected players based on category
 const selectedPlayers = computed<PlayerStat[]>(() => {
   switch (selectedCategory.value) {
-    case 'topScorers':
-      return props.topScorers || [];
     case 'topAssists':
       return props.topAssists || [];
     case 'mostCleanSheets':
       return props.mostCleanSheets || [];
+    case 'topScorers':
     default:
-      // Should not happen with strict typing, but good practice
-      const exhaustiveCheck: never = selectedCategory.value;
-      console.warn(`Unhandled category: ${exhaustiveCheck}`);
-      return [];
+      return props.topScorers || [];
   }
 });
-
-// Robust image fallback logic for player photos
-const fallbackImg = '/fallback-player.png';
-const erroredPlayers = ref<Record<string, boolean>>({});
-function imgSrc(photo: string) {
-  return erroredPlayers.value[photo] ? fallbackImg : photo;
-}
-function onImgError(event: Event, player: any) {
-  if (!erroredPlayers.value[player.photo]) {
-    erroredPlayers.value[player.photo] = true;
-    const target = event.target as HTMLImageElement | null;
-    if (target) target.src = fallbackImg;
-  }
-}
-
 </script>
 
 <style scoped>
-/* Add any specific styles if needed */
 button {
   transition: all 0.2s ease-in-out;
-  border-bottom-width: 2px; /* Ensure space for border even when transparent */
+  border-bottom-width: 2px;
   border-bottom-style: solid;
-  margin-bottom: -2px; /* Counteract the border space */
+  margin-bottom: -2px;
 }
 </style>

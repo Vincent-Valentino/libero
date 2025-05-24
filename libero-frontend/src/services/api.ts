@@ -411,29 +411,41 @@ export const getFixturesSummary = async (competitionCode: string): Promise<Fixtu
 
 
 // In api.ts, for clarity, rename this:
-interface BackendCompetitionStandingsDTO { // Previously StandingsResponse
-  competition_name: string;              // From models.CompetitionStandingsDTO
-  competition_code: string;              // From models.CompetitionStandingsDTO
-  season: number;                        // From models.CompetitionStandingsDTO
-  standings: Array<{                     // This is models.StandingsTableDTO
-    position: number;
-    team_name: string; // from backend StandingsTableDTO
-    team_crest: string; // from backend StandingsTableDTO
-    played: number;
-    won: number;
-    drawn: number; // "drawn" in backend DTO
-    lost: number;
-    goals_for: number;
-    goals_against: number;
-    goal_difference: number;
-    points: number;
+interface BackendCompetitionStandingsDTO {
+  competition_name: string;
+  competition_code: string;
+  season: number;
+  standings: Array<{
+      position: number;
+      team_name: string;
+      team_crest: string;
+      played_games: number;  // Changed from played to match backend
+      won: number;
+      draw: number;  // Changed from drawn to match backend
+      lost: number;
+      goals_for: number;
+      goals_against: number;
+      goal_difference: number;
+      points: number;
   }>;
 }
 
 export const getStandings = async (competitionCode: string): Promise<LeagueTableRow[]> => {
+  console.log(`[API] Getting standings for ${competitionCode}`);
   // Expecting backend to return CompetitionStandingsDTO
   const response = await apiClient.get<BackendCompetitionStandingsDTO>(`/standings?competition=${competitionCode}`);
   
+  // Show the full API response in a readable way for debugging
+  console.log('[API] Raw standings response:', response.data);
+
+  // Check if the response has the expected structure
+  if (!response.data.standings || !Array.isArray(response.data.standings)) {
+    console.error('[API] Invalid standings data structure:', response.data);
+    return [];
+  }
+
+  console.log('[API] Processing standings data:', response.data.standings);
+
   // Transform backend data to match frontend interface
   return response.data.standings.map(row => ({
     position: row.position,
@@ -442,9 +454,9 @@ export const getStandings = async (competitionCode: string): Promise<LeagueTable
       name: row.team_name,
       logo: row.team_crest,
     },
-    played: row.played,
+    played: row.played_games,  // Match backend field
     won: row.won,
-    drawn: row.drawn,
+    drawn: row.draw,  // Match backend field
     lost: row.lost,
     goalsFor: row.goals_for,
     goalsAgainst: row.goals_against,

@@ -26,36 +26,57 @@ export const useLeagueStore = defineStore('league', () => {
 
   // Actions
   const fetchStandings = async (competitionCode: string) => {
-    // If we already have data for this competition, use it
-    if (standingsCache.value[competitionCode] && standingsCache.value[competitionCode].length > 0) {
-      console.log(`Using cached standings for ${competitionCode}`);
-      standings.value = standingsCache.value[competitionCode];
-      return;
-    }
+  console.log(`[Store] Starting fetchStandings for ${competitionCode}`);
+  
+  // Check cache state
+  console.log('[Store] Cache state:', {
+    hasCache: !!standingsCache.value[competitionCode],
+    cacheLength: standingsCache.value[competitionCode]?.length
+  });
 
-    console.log(`Fetching standings for ${competitionCode}...`);
-    isLoadingStandings.value = true;
-    standingsError.value = '';
-    try {
-      console.log('Making API call to get standings...');
-      const data = await getStandings(competitionCode);
-      console.log('Received standings data:', data);
-      standings.value = data;
-      // Only cache if data is non-empty
-      if (Array.isArray(data) && data.length > 0) {
-        standingsCache.value[competitionCode] = data;
-      }
-    } catch (error: any) {
+  // If we already have data for this competition, use it
+  if (standingsCache.value[competitionCode] && standingsCache.value[competitionCode].length > 0) {
+    console.log(`[Store] Using cached standings for ${competitionCode}`, {
+      cachedRows: standingsCache.value[competitionCode].length,
+      firstTeam: standingsCache.value[competitionCode][0]?.team.name
+    });
+    standings.value = standingsCache.value[competitionCode];
+    return;
+  }
+
+  console.log(`[Store] No cache found, fetching standings for ${competitionCode}...`);
+  isLoadingStandings.value = true;
+  standingsError.value = '';
+  
+  try {
+    const data = await getStandings(competitionCode);
+    console.log('[Store] API call successful. Received standings data:', {
+      hasData: !!data,
+      isArray: Array.isArray(data),
+      length: data?.length,
+      teams: data?.map(row => row.team.name)
+    });
+    
+    standings.value = data;
+    
+    // Only cache if data is non-empty
+    if (Array.isArray(data) && data.length > 0) {
+      standingsCache.value[competitionCode] = data;
+      console.log('[Store] Cached standings data for future use');
+    } else {
+      console.warn('[Store] No data to cache - empty response');
+    }
+  } catch (error: any) {
       const errorMessage = error.response?.data?.message || error.message || 'Failed to load standings';
       standingsError.value = errorMessage;
-      console.error('Error fetching standings:', {
+      console.error('[Store] Error fetching standings:', {
         code: competitionCode,
         error: error,
         response: error.response?.data
       });
     } finally {
       isLoadingStandings.value = false;
-      console.log('Standings fetch complete. HasData:', standings.value.length > 0);
+      console.log('[Store] Standings fetch complete. HasData:', standings.value.length > 0);
     }
   };
   const fetchTopScorers = async (competitionCode: string) => {

@@ -70,15 +70,29 @@
 </template>
 
 <script setup lang="ts">
-import { defineProps, ref } from "vue";
+import { defineProps, ref, onMounted, watch } from "vue";
 import type { LeagueTableRow } from "../mockData";
 
-defineProps<{
+// Props
+const props = defineProps<{
   tableData: LeagueTableRow[];
   themeColor: string;
   isLoading?: boolean;
   error?: string;
 }>();
+
+// Add logger to monitor incoming data
+onMounted(() => {
+  console.log('[LeagueTable] Component mounted');
+});
+
+watch(() => props.tableData, (newData) => {
+  console.log('[LeagueTable] Table data updated:', {
+    rows: newData.length,
+    firstTeam: newData[0]?.team.name,
+    isArray: Array.isArray(newData)
+  });
+}, { immediate: true });
 
 const fallbackTeamLogo = '/fallback-team.png';
 const erroredTeams = ref<Record<string, boolean>>({});

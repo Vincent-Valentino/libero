@@ -62,8 +62,7 @@
             <h3 class="text-lg font-semibold mb-4" :style="{ color: currentLeague?.themeColor }">Top Scorers</h3>
             <div v-if="!isLoadingScorers && topScorers.length > 0" class="space-y-4">
               <div v-for="scorer in topScorers.slice(0, 5)" :key="scorer.id" class="flex items-center">
-                <img :src="scorer.photo" :alt="scorer.name" class="w-12 h-12 rounded-full mr-4 object-cover"
-                     @error="event => (event.target as HTMLImageElement).src = '/public/default-player.png'">
+                <img :src="scorer.photo" :alt="scorer.name" class="w-12 h-12 rounded-full mr-4 object-cover">
                 <div>
                   <div class="font-medium">{{ scorer.name }}</div>
                   <div class="text-sm text-gray-500">{{ scorer.team.name }}</div>
@@ -166,12 +165,18 @@ watch(
   async (newCode: string | string[]) => {
     try {
       const code = (typeof newCode === 'string' ? newCode : 'PL').toUpperCase();
-      console.log(`Route changed to league: ${code}`);
+      console.log(`[LeaguePage] Loading data for ${code}`);
       
       // Always load data on first render, but use cache if available on subsequent navigation
       await store.fetchAllLeagueData(code);
+      
+      console.log('[LeaguePage] Current state:', {
+        standings: standings.value.length,
+        hasError: !!standingsError.value,
+        error: standingsError.value,
+      });
     } catch (error: any) {
-      console.error('Error fetching league data:', error);
+      console.error('[LeaguePage] Error fetching league data:', error);
     }
   },
   { immediate: true }
