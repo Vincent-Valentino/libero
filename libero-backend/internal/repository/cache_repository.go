@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // CacheRepository defines the interface for cache data operations
@@ -70,30 +71,20 @@ func (r *cacheRepository) GetCachedFixturesIgnoringExpiry(competitionCode, dataT
 
 // StoreCachedFixtures stores fixtures data with an expiration time
 func (r *cacheRepository) StoreCachedFixtures(competitionCode, dataType string, data models.JSONB, ttl time.Duration) error {
-	// Try to find existing record first
-	var existing models.CachedFixtures
-	result := r.db.Where("competition_code = ? AND data_type = ?", competitionCode, dataType).First(&existing)
-
 	expiresAt := time.Now().Add(ttl)
-
-	// Update existing or create new
-	if result.Error == nil {
-		// Update existing
-		existing.Data = data
-		existing.ExpiresAt = expiresAt
-		return r.db.Save(&existing).Error
-	} else {
-		// Create new
-		cache := models.CachedFixtures{
-			CompetitionCode: competitionCode,
-			DataType:        dataType,
-			Data:            data,
-			CachedData: models.CachedData{
-				ExpiresAt: expiresAt,
-			},
-		}
-		return r.db.Create(&cache).Error
+	cache := models.CachedFixtures{
+		CompetitionCode: competitionCode,
+		DataType:        dataType,
+		Data:            data,
+		CachedData: models.CachedData{
+			ExpiresAt: expiresAt,
+		},
 	}
+	// Use upsert to avoid duplicate key errors (only one row per competitionCode+dataType)
+	return r.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "competition_code"}, {Name: "data_type"}},
+		DoUpdates: clause.AssignmentColumns([]string{"data", "expires_at", "updated_at"}),
+	}).Create(&cache).Error
 }
 
 // GetCachedTodayFixtures retrieves cached today's fixtures data if not expired
@@ -122,30 +113,19 @@ func (r *cacheRepository) GetCachedTodayFixturesIgnoringExpiry() (*models.Cached
 	return &cache, nil
 }
 
-// StoreCachedTodayFixtures stores today's fixtures data with an expiration time
+// StoreCachedFixtures stores fixtures data with an expiration time
 func (r *cacheRepository) StoreCachedTodayFixtures(data models.JSONB, ttl time.Duration) error {
-	// Try to find existing record first
-	var existing models.CachedTodayFixtures
-	result := r.db.First(&existing)
-
 	expiresAt := time.Now().Add(ttl)
-
-	// Update existing or create new
-	if result.Error == nil {
-		// Update existing
-		existing.Data = data
-		existing.ExpiresAt = expiresAt
-		return r.db.Save(&existing).Error
-	} else {
-		// Create new
-		cache := models.CachedTodayFixtures{
-			Data: data,
-			CachedData: models.CachedData{
-				ExpiresAt: expiresAt,
-			},
-		}
-		return r.db.Create(&cache).Error
+	cache := models.CachedTodayFixtures{
+		Data: data,
+		CachedData: models.CachedData{
+			ExpiresAt: expiresAt,
+		},
 	}
+	// Use upsert to avoid duplicate key errors (only one row should exist)
+	return r.db.Clauses(clause.OnConflict{
+		DoUpdates: clause.AssignmentColumns([]string{"data", "expires_at", "updated_at"}),
+	}).Create(&cache).Error
 }
 
 // CleanExpiredCache removes all expired cache entries
@@ -193,14 +173,19 @@ func (r *cacheRepository) Set(key string, value []byte, ttl time.Duration) error
 		ExpiresAt:    time.Now().Add(ttl),
 		LastModified: time.Now(),
 	}
-
-	// Upsert the cache item
-	return r.db.Save(&cacheItem).Error
+	// Upsert the cache item (avoid duplicate key errors)
+	return r.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "key"}},
+		DoUpdates: clause.AssignmentColumns([]string{"value", "expires_at", "last_modified"}),
+	}).Create(&cacheItem).Error
 }
 
 // SetWithMetadata stores a cache item with all metadata
 func (r *cacheRepository) SetWithMetadata(key string, item models.CacheItem) error {
-	return r.db.Save(&item).Error
+	return r.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "key"}},
+		DoUpdates: clause.AssignmentColumns([]string{"value", "expires_at", "last_modified", "e_tag"}),
+	}).Create(&item).Error
 }
 
 // UpdateVersion updates the version (ETag) of a cached item

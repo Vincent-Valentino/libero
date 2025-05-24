@@ -233,14 +233,14 @@ func (s *fixturesService) GetTodaysFixtures() ([]models.CompetitionFixturesDTO, 
 		}
 	}
 
-	// Store in cache for future use (with 2 hour TTL)
+	// Store in cache for future use (with 24 hour TTL)
 	if len(result) > 0 {
 		resultJSON, err := json.Marshal(result)
 		if err == nil {
 			var jsonData models.JSONB
 			err = json.Unmarshal(resultJSON, &jsonData)
 			if err == nil {
-				s.cacheRepo.StoreCachedTodayFixtures(jsonData, 2*time.Hour)
+				s.cacheRepo.StoreCachedTodayFixtures(jsonData, 24*time.Hour)
 			}
 		}
 	}
@@ -250,8 +250,7 @@ func (s *fixturesService) GetTodaysFixtures() ([]models.CompetitionFixturesDTO, 
 
 // Implement the fixtures summary: today, tomorrow, upcoming
 func (s *fixturesService) GetFixturesSummary(competitionCode string) (models.FixturesSummaryDTO, error) {
-	// Ensure external API receives uppercase competition codes (e.g. 'PL')
-	compCode := strings.ToUpper(competitionCode)
+	compCode := mapCompetitionCode(strings.ToUpper(competitionCode))
 
 	// Try to get data from cache first
 	cachedData, err := s.cacheRepo.GetCachedFixtures(compCode, "fixtures_summary")
@@ -279,33 +278,24 @@ func (s *fixturesService) GetFixturesSummary(competitionCode string) (models.Fix
 		return models.FixturesSummaryDTO{}, err
 	}
 	reqComp.Header.Set("X-Auth-Token", s.apiKey)
-	// Perform request
 	respComp, err := http.DefaultClient.Do(reqComp)
 	if err != nil {
 		return models.FixturesSummaryDTO{}, err
 	}
 	defer respComp.Body.Close()
 
-	// Handle rate limit response
-	if respComp.StatusCode == http.StatusTooManyRequests {
-		// Try to get from cache even if it's expired
-		expiredCache, expErr := s.cacheRepo.GetCachedFixturesIgnoringExpiry(compCode, "fixtures_summary")
-		if expErr == nil && expiredCache != nil {
-			var summary models.FixturesSummaryDTO
-			dataBytes, err := json.Marshal(expiredCache.Data)
-			if err == nil {
-				if err := json.Unmarshal(dataBytes, &summary); err == nil {
-					return summary, nil
-				}
-			}
-		}
-
-		bodyBytes, _ := io.ReadAll(respComp.Body)
-		return models.FixturesSummaryDTO{}, fmt.Errorf("competition fetch failed: status %d, body: %s", respComp.StatusCode, string(bodyBytes))
+	if respComp.StatusCode == http.StatusNotFound {
+		// Return empty DTO for unsupported competitions
+		return models.FixturesSummaryDTO{
+			CompetitionName: "",
+			CompetitionCode: compCode,
+			LogoURL:         "",
+			Today:           []models.FixtureMatchDTO{},
+			Tomorrow:        []models.FixtureMatchDTO{},
+			Upcoming:        []models.FixtureMatchDTO{},
+		}, nil
 	}
-
 	if respComp.StatusCode != http.StatusOK {
-		// Read response body for diagnostics
 		bodyBytes, _ := io.ReadAll(respComp.Body)
 		return models.FixturesSummaryDTO{}, fmt.Errorf("competition fetch failed: status %d, body: %s", respComp.StatusCode, string(bodyBytes))
 	}
@@ -445,15 +435,22 @@ func (s *fixturesService) GetFixturesSummary(competitionCode string) (models.Fix
 		Upcoming:        upcomingList,
 	}
 
-	// Store in cache for future use (with 2 hour TTL)
+	// Store in cache for future use (with 24 hour TTL)
 	summaryJSON, err := json.Marshal(summary)
 	if err == nil {
 		var jsonData models.JSONB
 		err = json.Unmarshal(summaryJSON, &jsonData)
 		if err == nil {
-			s.cacheRepo.StoreCachedFixtures(compCode, "fixtures_summary", jsonData, 2*time.Hour)
+			s.cacheRepo.StoreCachedFixtures(compCode, "fixtures_summary", jsonData, 24*time.Hour)
 		}
 	}
 
 	return summary, nil
+}
+
+func mapCompetitionCode(code string) string {
+	if code == "EL" {
+		return "UEL"
+	}
+	return code
 }

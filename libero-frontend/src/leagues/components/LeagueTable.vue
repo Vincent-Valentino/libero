@@ -29,7 +29,12 @@
             <tr v-for="row in tableData" :key="row.position" class="text-sm border-b hover:bg-gray-50">
               <td class="p-3">{{ row.position }}</td>
               <td class="p-3 flex items-center">
-                <img :src="row.team.logo" :alt="row.team.name" class="w-6 h-6 mr-2">
+                <img
+                  :src="imgSrc(row.team.logo)"
+                  :alt="row.team.name"
+                  class="w-6 h-6 mr-2"
+                  @error="onImgError($event, row.team)"
+                >
                 {{ row.team.name }}
               </td>
               <td class="text-center p-3">{{ row.played }}</td>
@@ -65,7 +70,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineProps } from "vue";
+import { defineProps, ref } from "vue";
 import type { LeagueTableRow } from "../mockData";
 
 defineProps<{
@@ -74,6 +79,19 @@ defineProps<{
   isLoading?: boolean;
   error?: string;
 }>();
+
+const fallbackTeamLogo = '/fallback-team.png';
+const erroredTeams = ref<Record<string, boolean>>({});
+function imgSrc(logo: string) {
+  return erroredTeams.value[logo] ? fallbackTeamLogo : logo;
+}
+function onImgError(event: Event, team: any) {
+  if (!erroredTeams.value[team.logo]) {
+    erroredTeams.value[team.logo] = true;
+    const target = event.target as HTMLImageElement | null;
+    if (target) target.src = fallbackTeamLogo;
+  }
+}
 </script>
 
 <style scoped>

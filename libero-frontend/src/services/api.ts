@@ -16,6 +16,14 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Fix common URL issues - API path corrections
+    if (config.url && (config.url.startsWith('/api/') || config.url.startsWith('api/'))) {
+      // Remove duplicate /api prefix since the baseURL already has it
+      config.url = config.url.replace(/^\/?(api\/)/g, '');
+      console.warn('Corrected duplicate API prefix in URL:', config.url);
+    }
+    
     console.log('API Request:', {
       url: config.url,
       method: config.method,
@@ -41,7 +49,14 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error: any): Promise<any> => {
-    if (error.response) {
+    // Handle network errors gracefully
+    if (error.code === 'ECONNABORTED' || !error.response) {
+      console.error('Network Error:', {
+        url: error.config?.url || 'unknown',
+        message: error.message,
+        code: error.code
+      });
+    } else if (error.response) {
       console.error('API Error:', {
         url: error.config.url,
         status: error.response.status,
@@ -321,9 +336,33 @@ export const getTodaysFixtures = (): Promise<CompetitionFixturesDTO[]> => {
  * @param competitionCode - competition code (e.g., 'PL', 'CL')
  * @returns Promise containing the fixtures summary DTO
  */
-export const getFixturesSummary = (competitionCode: string): Promise<FixturesSummaryDTO> => {
-  return apiClient.get<FixturesSummaryDTO>(`/api/sports/fixtures/summary?competition=${competitionCode}`)
-    .then(response => response.data);
+export const getFixturesSummary = async (competitionCode: string): Promise<FixturesSummaryDTO> => {
+  try {
+    // Make the API request with correct path
+    const response = await apiClient.get<FixturesSummaryDTO>(`/sports/fixtures/summary?competition=${competitionCode}`);
+    return response.data;
+  } catch (error: any) {
+    console.error(`Error fetching fixtures summary for ${competitionCode}:`, error);
+    
+    // Create an empty response structure if the API fails
+    // This allows the UI to render properly without errors
+    const emptyResponse: FixturesSummaryDTO = {
+      competition_name: "",
+      competition_code: competitionCode,
+      logo_url: "",
+      today: [],
+      tomorrow: [],
+      upcoming: []
+    };
+    
+    if (error.response && error.response.status === 404) {
+      console.warn(`No fixtures found for ${competitionCode}`);
+      return emptyResponse;
+    }
+    
+    // For other errors, throw to let the store handle them
+    throw error;
+  }
 };
 
 
@@ -413,36 +452,39 @@ export const getStandings = async (competitionCode: string): Promise<LeagueTable
     points: row.points,
   }));
 };
-interface ScorersResponse {
-  scorers: Array<{
-    player: {
-      id: number;
-      name: string;
-    };
-    team: {
-      id: number;
-      name: string;
-      crest: string;
-    };
-    goals: number;
-    assists: number;
-  }>;
-}
 
 export const getTopScorers = async (competitionCode: string): Promise<PlayerStat[]> => {
-  const response = await apiClient.get<ScorersResponse>(`/api/topscorers?competition=${competitionCode}`);
-  
-  return response.data.scorers.map(scorer => ({
-    id: scorer.player.id,
-    name: scorer.player.name,
-    team: {
-      id: scorer.team.id,
-      name: scorer.team.name,
-      logo: scorer.team.crest
-    },
-    value: scorer.goals,
-    photo: `/public/${scorer.player.name}.png` // Assuming player photos are stored with player names
-  }));
+  try {
+    // Backend returns CompetitionScorersDTO with a 'scorers' array of flat objects
+    const response = await apiClient.get<{ scorers: Array<{
+      player_name: string;
+      team_name: string;
+      team_crest: string;
+      goals: number;
+      assists: number;
+      penalties: number;
+    }> }>(`/topscorers?competition=${competitionCode}`);
+
+    const scorers = response.data.scorers || [];
+    // If scorers is empty or not an array, return an empty array
+    if (!Array.isArray(scorers) || scorers.length === 0) return [];
+
+    return scorers.map((scorer, idx) => ({
+      id: idx + 1, // Use index as fallback id
+      name: scorer.player_name,
+      team: {
+        id: idx + 1, // No team id from backend, use index
+        name: scorer.team_name,
+        logo: scorer.team_crest
+      },
+      value: scorer.goals,
+      photo: `/public/${scorer.player_name}.png` // Assuming player photos are stored with player names
+    }));
+  } catch (error) {
+    console.error(`Error fetching top scorers for ${competitionCode}:`, error);
+    // Return empty array to allow UI to fallback to mock data
+    return [];
+  }
 };
 
 export default apiClient;

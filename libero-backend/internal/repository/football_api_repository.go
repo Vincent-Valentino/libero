@@ -99,7 +99,7 @@ func (r *footballAPIRepository) GetStandings(competitionCode string) (models.Sta
 	if err == nil {
 		var jsonData models.JSONB
 		if err := json.Unmarshal(responseBytes, &jsonData); err == nil {
-			r.cacheRepo.StoreCachedFixtures(competitionCode, "standings", jsonData, 1*time.Hour)
+			r.cacheRepo.StoreCachedFixtures(competitionCode, "standings", jsonData, 24*time.Hour)
 		}
 	}
 
@@ -144,7 +144,7 @@ func (r *footballAPIRepository) GetTopScorers(competitionCode string) (models.Sc
 	if err == nil {
 		var jsonData models.JSONB
 		if err := json.Unmarshal(responseBytes, &jsonData); err == nil {
-			r.cacheRepo.StoreCachedFixtures(competitionCode, "scorers", jsonData, 1*time.Hour)
+			r.cacheRepo.StoreCachedFixtures(competitionCode, "scorers", jsonData, 24*time.Hour)
 		}
 	}
 

@@ -29,7 +29,12 @@
        <div v-for="(player, index) in selectedPlayers" :key="player.id" class="flex items-center justify-between p-3 bg-gray-50 rounded">
          <div class="flex items-center space-x-3">
            <span class="font-semibold text-gray-500 w-5 text-right">{{ index + 1 }}.</span>
-           <img :src="player.photo" :alt="player.name" class="h-8 w-8 rounded-full object-cover border">
+           <img
+             :src="imgSrc(player.photo)"
+             :alt="player.name"
+             class="h-8 w-8 rounded-full object-cover border"
+             @error="onImgError($event, player)"
+           >
            <div>
              <div class="font-medium text-sm">{{ player.name }}</div>
              <div class="text-xs text-gray-500">{{ player.team.name }}</div>
@@ -85,6 +90,20 @@ const selectedPlayers = computed<PlayerStat[]>(() => {
       return [];
   }
 });
+
+// Robust image fallback logic for player photos
+const fallbackImg = '/fallback-player.png';
+const erroredPlayers = ref<Record<string, boolean>>({});
+function imgSrc(photo: string) {
+  return erroredPlayers.value[photo] ? fallbackImg : photo;
+}
+function onImgError(event: Event, player: any) {
+  if (!erroredPlayers.value[player.photo]) {
+    erroredPlayers.value[player.photo] = true;
+    const target = event.target as HTMLImageElement | null;
+    if (target) target.src = fallbackImg;
+  }
+}
 
 </script>
 

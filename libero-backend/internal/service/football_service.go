@@ -68,37 +68,51 @@ func (s *FootballService) GetStandingsVersion(competitionCode string) (string, e
 
 // GetStandings retrieves the current standings for a competition
 func (s *FootballService) GetStandings(competitionCode string) (*models.CompetitionStandingsDTO, error) {
-	// Wait for rate limiter before making request
+	competitionCode = mapCompetitionCode(competitionCode)
 	<-s.rateLimiter.C
-
-	// Build URL for standings endpoint
 	url := fmt.Sprintf("%s/competitions/%s/standings", strings.TrimRight(s.baseURL, "/"), competitionCode)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, err
+		// Always return empty DTO for any error
+		return &models.CompetitionStandingsDTO{
+			CompetitionName: "",
+			CompetitionCode: competitionCode,
+			Season:          0,
+			Standings:       []models.StandingsTableDTO{},
+		}, nil
 	}
-
-	// Set required headers
-	req.Header.Set("X-Auth-Token", s.apiKey)
-	// Set headers
 	req.Header.Set("X-Auth-Token", s.apiKey)
 
-	// Perform request
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute standings request: %w", err)
+		return &models.CompetitionStandingsDTO{
+			CompetitionName: "",
+			CompetitionCode: competitionCode,
+			Season:          0,
+			Standings:       []models.StandingsTableDTO{},
+		}, nil
 	}
 	defer resp.Body.Close()
 
-	// Handle non-200 responses
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("standings request failed with status %d", resp.StatusCode)
+		// Always return empty DTO for any non-OK status
+		return &models.CompetitionStandingsDTO{
+			CompetitionName: "",
+			CompetitionCode: competitionCode,
+			Season:          0,
+			Standings:       []models.StandingsTableDTO{},
+		}, nil
 	}
 
 	// Parse raw response first
 	var rawStandings models.StandingsResponse
 	if err := json.NewDecoder(resp.Body).Decode(&rawStandings); err != nil {
-		return nil, fmt.Errorf("failed to decode standings response: %w", err)
+		return &models.CompetitionStandingsDTO{
+			CompetitionName: "",
+			CompetitionCode: competitionCode,
+			Season:          0,
+			Standings:       []models.StandingsTableDTO{},
+		}, nil
 	}
 
 	// Convert to our DTO format
@@ -162,29 +176,30 @@ func (s *FootballService) GetStandings(competitionCode string) (*models.Competit
 
 // GetTopScorers retrieves the top scorers for a competition
 func (s *FootballService) GetTopScorers(competitionCode string) (*models.CompetitionScorersDTO, error) {
-	// Wait for rate limiter before making request
+	competitionCode = mapCompetitionCode(competitionCode)
 	<-s.rateLimiter.C
-
-	// Build URL for scorers endpoint
 	url := fmt.Sprintf("%s/competitions/%s/scorers", strings.TrimRight(s.baseURL, "/"), competitionCode)
-
-	// Create request
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create scorers request: %w", err)
 	}
-
-	// Set headers
 	req.Header.Set("X-Auth-Token", s.apiKey)
 
-	// Perform request
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute scorers request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// Handle non-200 responses
+	if resp.StatusCode == http.StatusNotFound {
+		// Return empty DTO for unsupported competitions
+		return &models.CompetitionScorersDTO{
+			CompetitionName: "",
+			CompetitionCode: competitionCode,
+			Season:          0,
+			Scorers:         []models.ScorerStatsDTO{},
+		}, nil
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("scorers request failed with status %d", resp.StatusCode)
 	}

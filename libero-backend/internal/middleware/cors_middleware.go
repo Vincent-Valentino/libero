@@ -8,14 +8,17 @@ import (
 // CORSMiddleware adds CORS headers to responses
 func CORSMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Allow requests from our frontend development server
+		// Allow requests from any origin
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 
 		// Allow common HTTP methods
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 
-		// Allow common headers
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+		// Allow all headers the client might send
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept, X-Requested-With, Cache-Control")
+
+		// Allow credentials (cookies, authorization headers)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
 
 		// Handle preflight requests
 		if r.Method == "OPTIONS" {

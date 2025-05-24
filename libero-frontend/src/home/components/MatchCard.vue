@@ -7,7 +7,12 @@
           v-if="homeTeam.logo"
           class="w-10 h-10 rounded-full overflow-hidden"
         >
-          <img :src="homeTeam.logo" :alt="homeTeam.name" class="w-full h-full object-contain" />
+          <img
+            :src="imgSrc(homeTeam.logo)"
+            :alt="homeTeam.name"
+            class="w-full h-full object-contain"
+            @error="onImgError($event, homeTeam)"
+          />
         </div>
         <div
           v-else
@@ -34,7 +39,12 @@
         <div 
           v-if="awayTeam.logo" 
           class="w-10 h-10 rounded-full overflow-hidden">
-          <img :src="awayTeam.logo" :alt="awayTeam.name" class="w-full h-full object-contain" />
+          <img
+            :src="imgSrc(awayTeam.logo)"
+            :alt="awayTeam.name"
+            class="w-full h-full object-contain"
+            @error="onImgError($event, awayTeam)"
+          />
         </div>
         <div 
           v-else
@@ -71,6 +81,21 @@ interface MatchCardProps {
 }
 
 defineProps<MatchCardProps>();
+
+import { ref } from 'vue';
+
+const fallbackTeamLogo = '/fallback-team.png';
+const erroredTeams = ref<Record<string, boolean>>({});
+function imgSrc(logo: string) {
+  return erroredTeams.value[logo] ? fallbackTeamLogo : logo;
+}
+function onImgError(event: Event, team: any) {
+  if (!erroredTeams.value[team.logo]) {
+    erroredTeams.value[team.logo] = true;
+    const target = event.target as HTMLImageElement | null;
+    if (target) target.src = fallbackTeamLogo;
+  }
+}
 </script>
 
 <style scoped>

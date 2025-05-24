@@ -98,22 +98,8 @@ func (c *SportsDataController) HandleGetStandings(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Try to get latest data version from football service
-	latestVersion, err := c.footballService.GetStandingsVersion(competition)
-	if err != nil {
-		fmt.Printf("Error checking standings version for %s: %v\n", competition, err)
-		// Continue to try cache if version check fails
-	}
-
-	// Try to get from cache first
 	cacheKey := fmt.Sprintf("standings_%s", competition)
-	if clientETag := r.Header.Get("If-None-Match"); clientETag != "" && clientETag == latestVersion {
-		// Client has latest version
-		w.WriteHeader(http.StatusNotModified)
-		return
-	}
-
-	if cachedData, err := c.cacheRepo.GetWithVersion(cacheKey, latestVersion); err == nil {
+	if cachedData, err := c.cacheRepo.Get(cacheKey); err == nil && cachedData != nil {
 		var standings interface{}
 		if err := json.Unmarshal(cachedData.Value, &standings); err == nil {
 			w.Header().Set("ETag", cachedData.ETag)
@@ -123,7 +109,6 @@ func (c *SportsDataController) HandleGetStandings(w http.ResponseWriter, r *http
 		}
 	}
 
-	// If not in cache or version mismatch, fetch from service
 	standings, err := c.footballService.GetStandings(competition)
 	if err != nil {
 		fmt.Printf("Error fetching standings for %s: %v\n", competition, err)
@@ -131,25 +116,17 @@ func (c *SportsDataController) HandleGetStandings(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Generate new ETag for fresh data
 	newETag := fmt.Sprintf("%d", time.Now().UnixNano())
-
-	// Cache the fresh results for 1 hour
 	if standingsJSON, err := json.Marshal(standings); err == nil {
 		cacheItem := models.CacheItem{
 			Key:          cacheKey,
 			Value:        standingsJSON,
 			ETag:         newETag,
 			LastModified: time.Now(),
-			ExpiresAt:    time.Now().Add(1 * time.Hour),
+			ExpiresAt:    time.Now().Add(24 * time.Hour),
 		}
-		if err := c.cacheRepo.SetWithMetadata(cacheKey, cacheItem); err != nil {
-			fmt.Printf("Error caching standings for %s: %v\n", competition, err)
-			// Continue despite cache error
-		}
+		_ = c.cacheRepo.SetWithMetadata(cacheKey, cacheItem)
 	}
-
-	// Set fresh data headers
 	w.Header().Set("ETag", newETag)
 	w.Header().Set("Last-Modified", time.Now().Format(http.TimeFormat))
 	utils.RespondWithJSON(w, http.StatusOK, standings)
@@ -162,55 +139,33 @@ func (c *SportsDataController) HandleGetTopScorers(w http.ResponseWriter, r *htt
 		http.Error(w, "competition code is required", http.StatusBadRequest)
 		return
 	}
-
-	// Try to get from cache first
 	cacheKey := fmt.Sprintf("scorers_%s", competition)
 	if cachedItem, err := c.cacheRepo.Get(cacheKey); err == nil && cachedItem != nil {
-		// Check if client's cached version is still valid
-		if clientETag := r.Header.Get("If-None-Match"); clientETag != "" && clientETag == cachedItem.ETag {
-			w.WriteHeader(http.StatusNotModified)
+		var scorers interface{}
+		if err := json.Unmarshal(cachedItem.Value, &scorers); err == nil {
+			w.Header().Set("ETag", cachedItem.ETag)
+			w.Header().Set("Last-Modified", cachedItem.LastModified.Format(http.TimeFormat))
+			utils.RespondWithJSON(w, http.StatusOK, scorers)
 			return
 		}
-
-		// Return cached data if it's not expired
-		if cachedItem.ExpiresAt.After(time.Now()) {
-			var scorers interface{}
-			if err := json.Unmarshal(cachedItem.Value, &scorers); err == nil {
-				w.Header().Set("ETag", cachedItem.ETag)
-				w.Header().Set("Last-Modified", cachedItem.LastModified.Format(http.TimeFormat))
-				utils.RespondWithJSON(w, http.StatusOK, scorers)
-				return
-			}
-		}
 	}
-
-	// If not in cache or cache error, fetch from service
 	scorers, err := c.footballService.GetTopScorers(competition)
 	if err != nil {
 		fmt.Printf("Error fetching top scorers for %s: %v\n", competition, err)
 		http.Error(w, "Failed to retrieve top scorers data", http.StatusInternalServerError)
 		return
 	}
-
-	// Generate new ETag for fresh data
 	newETag := fmt.Sprintf("%d", time.Now().UnixNano())
-
-	// Cache the results for 1 hour
 	if scorersJSON, err := json.Marshal(scorers); err == nil {
 		cacheItem := models.CacheItem{
 			Key:          cacheKey,
 			Value:        scorersJSON,
 			ETag:         newETag,
 			LastModified: time.Now(),
-			ExpiresAt:    time.Now().Add(1 * time.Hour),
+			ExpiresAt:    time.Now().Add(24 * time.Hour),
 		}
-		if err := c.cacheRepo.SetWithMetadata(cacheKey, cacheItem); err != nil {
-			fmt.Printf("Error caching scorers for %s: %v\n", competition, err)
-			// Continue despite cache error
-		}
+		_ = c.cacheRepo.SetWithMetadata(cacheKey, cacheItem)
 	}
-
-	// Set fresh data headers
 	w.Header().Set("ETag", newETag)
 	w.Header().Set("Last-Modified", time.Now().Format(http.TimeFormat))
 	utils.RespondWithJSON(w, http.StatusOK, scorers)
@@ -218,54 +173,33 @@ func (c *SportsDataController) HandleGetTopScorers(w http.ResponseWriter, r *htt
 
 // HandleGetTodaysFixtures handles requests for today's fixtures.
 func (c *SportsDataController) HandleGetTodaysFixtures(w http.ResponseWriter, r *http.Request) {
-	// Try to get from cache first
 	cacheKey := fmt.Sprintf("todays_fixtures_%s", time.Now().Format("2006-01-02"))
 	if cachedItem, err := c.cacheRepo.Get(cacheKey); err == nil && cachedItem != nil {
-		// Check if client's cached version is still valid
-		if clientETag := r.Header.Get("If-None-Match"); clientETag != "" && clientETag == cachedItem.ETag {
-			w.WriteHeader(http.StatusNotModified)
+		var fixtures interface{}
+		if err := json.Unmarshal(cachedItem.Value, &fixtures); err == nil {
+			w.Header().Set("ETag", cachedItem.ETag)
+			w.Header().Set("Last-Modified", cachedItem.LastModified.Format(http.TimeFormat))
+			utils.RespondWithJSON(w, http.StatusOK, fixtures)
 			return
 		}
-
-		// Return cached data if it's not expired
-		if cachedItem.ExpiresAt.After(time.Now()) {
-			var fixtures interface{}
-			if err := json.Unmarshal(cachedItem.Value, &fixtures); err == nil {
-				w.Header().Set("ETag", cachedItem.ETag)
-				w.Header().Set("Last-Modified", cachedItem.LastModified.Format(http.TimeFormat))
-				utils.RespondWithJSON(w, http.StatusOK, fixtures)
-				return
-			}
-		}
 	}
-
-	// If not in cache or cache error, fetch from service
 	fixtures, err := c.fixturesService.GetTodaysFixtures()
 	if err != nil {
 		fmt.Printf("Error fetching today's fixtures: %v\n", err)
 		http.Error(w, "Failed to retrieve today's fixtures", http.StatusInternalServerError)
 		return
 	}
-
-	// Generate new ETag for fresh data
 	newETag := fmt.Sprintf("%d", time.Now().UnixNano())
-
-	// Cache the results for 15 minutes
 	if fixturesJSON, err := json.Marshal(fixtures); err == nil {
 		cacheItem := models.CacheItem{
 			Key:          cacheKey,
 			Value:        fixturesJSON,
 			ETag:         newETag,
 			LastModified: time.Now(),
-			ExpiresAt:    time.Now().Add(15 * time.Minute),
+			ExpiresAt:    time.Now().Add(24 * time.Hour),
 		}
-		if err := c.cacheRepo.SetWithMetadata(cacheKey, cacheItem); err != nil {
-			fmt.Printf("Error caching today's fixtures: %v\n", err)
-			// Continue despite cache error
-		}
+		_ = c.cacheRepo.SetWithMetadata(cacheKey, cacheItem)
 	}
-
-	// Set fresh data headers
 	w.Header().Set("ETag", newETag)
 	w.Header().Set("Last-Modified", time.Now().Format(http.TimeFormat))
 	utils.RespondWithJSON(w, http.StatusOK, fixtures)
@@ -278,53 +212,33 @@ func (c *SportsDataController) HandleGetFixturesSummary(w http.ResponseWriter, r
 		http.Error(w, "competition code is required", http.StatusBadRequest)
 		return
 	}
-
 	cacheKey := fmt.Sprintf("fixtures_summary_%s", competition)
 	if cachedItem, err := c.cacheRepo.Get(cacheKey); err == nil && cachedItem != nil {
-		// Check if client's cached version is still valid
-		if clientETag := r.Header.Get("If-None-Match"); clientETag != "" && clientETag == cachedItem.ETag {
-			w.WriteHeader(http.StatusNotModified)
+		var summary interface{}
+		if err := json.Unmarshal(cachedItem.Value, &summary); err == nil {
+			w.Header().Set("ETag", cachedItem.ETag)
+			w.Header().Set("Last-Modified", cachedItem.LastModified.Format(http.TimeFormat))
+			utils.RespondWithJSON(w, http.StatusOK, summary)
 			return
 		}
-
-		// Return cached data if it's not expired
-		if cachedItem.ExpiresAt.After(time.Now()) {
-			var summary interface{}
-			if err := json.Unmarshal(cachedItem.Value, &summary); err == nil {
-				w.Header().Set("ETag", cachedItem.ETag)
-				w.Header().Set("Last-Modified", cachedItem.LastModified.Format(http.TimeFormat))
-				utils.RespondWithJSON(w, http.StatusOK, summary)
-				return
-			}
-		}
 	}
-
 	summary, err := c.fixturesService.GetFixturesSummary(competition)
 	if err != nil {
 		fmt.Printf("Error fetching fixtures summary for %s: %v\n", competition, err)
 		http.Error(w, "Failed to retrieve fixtures summary", http.StatusInternalServerError)
 		return
 	}
-
-	// Generate new ETag for fresh data
 	newETag := fmt.Sprintf("%d", time.Now().UnixNano())
-
-	// Cache the results for 30 minutes
 	if summaryJSON, err := json.Marshal(summary); err == nil {
 		cacheItem := models.CacheItem{
 			Key:          cacheKey,
 			Value:        summaryJSON,
 			ETag:         newETag,
 			LastModified: time.Now(),
-			ExpiresAt:    time.Now().Add(30 * time.Minute),
+			ExpiresAt:    time.Now().Add(24 * time.Hour),
 		}
-		if err := c.cacheRepo.SetWithMetadata(cacheKey, cacheItem); err != nil {
-			fmt.Printf("Error caching fixtures summary for %s: %v\n", competition, err)
-			// Continue despite cache error
-		}
+		_ = c.cacheRepo.SetWithMetadata(cacheKey, cacheItem)
 	}
-
-	// Set fresh data headers
 	w.Header().Set("ETag", newETag)
 	w.Header().Set("Last-Modified", time.Now().Format(http.TimeFormat))
 	utils.RespondWithJSON(w, http.StatusOK, summary)

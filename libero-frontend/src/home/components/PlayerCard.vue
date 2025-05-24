@@ -9,7 +9,12 @@
         :stats="stats"
       />
     <div class="relative w-full">
-      <img :src="imagePath" :alt="name" class="w-full h-auto object-contain rounded-xl p-2 sm:p-3 md:p-5" />
+      <img
+        :src="imgSrc"
+        :alt="name"
+        class="w-full h-auto object-contain rounded-xl p-2 sm:p-3 md:p-5"
+        @error="onImgError"
+      />
     </div>
     <p class="text-center font-roboto-condensed font-black text-sm sm:text-base truncate w-full p-2 sm:p-3 md:p-5 mt-auto">{{ name }}</p>
   </div>
@@ -17,6 +22,7 @@
 
 <script setup lang="ts">
 import PlayerStatsOverlay from './PlayerStatsOverlay.vue';
+import { ref, watch } from 'vue';
 
 interface PlayerStats {
   appearances: number;
@@ -29,7 +35,7 @@ interface PlayerStats {
   xA: number;
 }
 
-defineProps({
+const props = defineProps({
   name: {
     type: String,
     required: true
@@ -58,5 +64,16 @@ defineProps({
     type: Object as () => PlayerStats,
     required: true
   }
+});
+
+const fallbackImg = '/fallback-player.png';
+const imgSrc = ref(props.imagePath);
+function onImgError() {
+  if (imgSrc.value !== fallbackImg) {
+    imgSrc.value = fallbackImg;
+  }
+}
+watch(() => props.imagePath, (newVal) => {
+  imgSrc.value = newVal;
 });
 </script>
