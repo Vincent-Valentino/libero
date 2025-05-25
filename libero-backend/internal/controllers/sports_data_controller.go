@@ -41,12 +41,36 @@ func NewSportsDataController(
 func (c *SportsDataController) HandleGetUpcomingMatches(w http.ResponseWriter, r *http.Request) {
 	matches, err := c.mlService.GetUpcomingMatches()
 	if err != nil {
-		// Log the error server-side (replace with proper logging)
 		fmt.Printf("Error fetching upcoming matches from ML service: %v\n", err)
 		http.Error(w, "Failed to retrieve upcoming matches", http.StatusInternalServerError)
 		return
 	}
-
+	// Only cache if matches is a non-empty slice
+	shouldCache := false
+	switch v := any(matches).(type) {
+	case []interface{}:
+		shouldCache = len(v) > 0
+	case []models.MatchDTO:
+		shouldCache = len(v) > 0
+	}
+	if shouldCache {
+		cacheKey := "upcoming_matches"
+		newETag := fmt.Sprintf("%d", time.Now().UnixNano())
+		if matchesJSON, err := json.Marshal(matches); err == nil {
+			cacheItem := models.CacheItem{
+				Key:          cacheKey,
+				Value:        matchesJSON,
+				ETag:         newETag,
+				LastModified: time.Now(),
+				ExpiresAt:    time.Now().Add(24 * time.Hour),
+			}
+			_ = c.cacheRepo.SetWithMetadata(cacheKey, cacheItem)
+		}
+		w.Header().Set("ETag", newETag)
+		w.Header().Set("Last-Modified", time.Now().Format(http.TimeFormat))
+	} else {
+		fmt.Printf("[WARN] Not caching empty upcoming matches\n")
+	}
 	utils.RespondWithJSON(w, http.StatusOK, matches)
 }
 
@@ -116,19 +140,24 @@ func (c *SportsDataController) HandleGetStandings(w http.ResponseWriter, r *http
 		return
 	}
 
-	newETag := fmt.Sprintf("%d", time.Now().UnixNano())
-	if standingsJSON, err := json.Marshal(standings); err == nil {
-		cacheItem := models.CacheItem{
-			Key:          cacheKey,
-			Value:        standingsJSON,
-			ETag:         newETag,
-			LastModified: time.Now(),
-			ExpiresAt:    time.Now().Add(24 * time.Hour),
+	// Only cache if standings is non-empty
+	if len(standings.Standings) > 0 {
+		newETag := fmt.Sprintf("%d", time.Now().UnixNano())
+		if standingsJSON, err := json.Marshal(standings); err == nil {
+			cacheItem := models.CacheItem{
+				Key:          cacheKey,
+				Value:        standingsJSON,
+				ETag:         newETag,
+				LastModified: time.Now(),
+				ExpiresAt:    time.Now().Add(24 * time.Hour),
+			}
+			_ = c.cacheRepo.SetWithMetadata(cacheKey, cacheItem)
 		}
-		_ = c.cacheRepo.SetWithMetadata(cacheKey, cacheItem)
+		w.Header().Set("ETag", newETag)
+		w.Header().Set("Last-Modified", time.Now().Format(http.TimeFormat))
+	} else {
+		fmt.Printf("[WARN] Not caching empty standings for %s\n", competition)
 	}
-	w.Header().Set("ETag", newETag)
-	w.Header().Set("Last-Modified", time.Now().Format(http.TimeFormat))
 	utils.RespondWithJSON(w, http.StatusOK, standings)
 }
 
@@ -155,19 +184,24 @@ func (c *SportsDataController) HandleGetTopScorers(w http.ResponseWriter, r *htt
 		http.Error(w, "Failed to retrieve top scorers data", http.StatusInternalServerError)
 		return
 	}
-	newETag := fmt.Sprintf("%d", time.Now().UnixNano())
-	if scorersJSON, err := json.Marshal(scorers); err == nil {
-		cacheItem := models.CacheItem{
-			Key:          cacheKey,
-			Value:        scorersJSON,
-			ETag:         newETag,
-			LastModified: time.Now(),
-			ExpiresAt:    time.Now().Add(24 * time.Hour),
+	// Only cache if scorers is non-empty
+	if len(scorers.Scorers) > 0 {
+		newETag := fmt.Sprintf("%d", time.Now().UnixNano())
+		if scorersJSON, err := json.Marshal(scorers); err == nil {
+			cacheItem := models.CacheItem{
+				Key:          cacheKey,
+				Value:        scorersJSON,
+				ETag:         newETag,
+				LastModified: time.Now(),
+				ExpiresAt:    time.Now().Add(24 * time.Hour),
+			}
+			_ = c.cacheRepo.SetWithMetadata(cacheKey, cacheItem)
 		}
-		_ = c.cacheRepo.SetWithMetadata(cacheKey, cacheItem)
+		w.Header().Set("ETag", newETag)
+		w.Header().Set("Last-Modified", time.Now().Format(http.TimeFormat))
+	} else {
+		fmt.Printf("[WARN] Not caching empty top scorers for %s\n", competition)
 	}
-	w.Header().Set("ETag", newETag)
-	w.Header().Set("Last-Modified", time.Now().Format(http.TimeFormat))
 	utils.RespondWithJSON(w, http.StatusOK, scorers)
 }
 
@@ -189,29 +223,36 @@ func (c *SportsDataController) HandleGetTodaysFixtures(w http.ResponseWriter, r 
 		http.Error(w, "Failed to retrieve today's fixtures", http.StatusInternalServerError)
 		return
 	}
-	newETag := fmt.Sprintf("%d", time.Now().UnixNano())
-	if fixturesJSON, err := json.Marshal(fixtures); err == nil {
-		cacheItem := models.CacheItem{
-			Key:          cacheKey,
-			Value:        fixturesJSON,
-			ETag:         newETag,
-			LastModified: time.Now(),
-			ExpiresAt:    time.Now().Add(24 * time.Hour),
+
+	// Only cache if fixtures is non-empty
+	if len(fixtures) > 0 {
+		newETag := fmt.Sprintf("%d", time.Now().UnixNano())
+		if fixturesJSON, err := json.Marshal(fixtures); err == nil {
+			cacheItem := models.CacheItem{
+				Key:          cacheKey,
+				Value:        fixturesJSON,
+				ETag:         newETag,
+				LastModified: time.Now(),
+				ExpiresAt:    time.Now().Add(24 * time.Hour),
+			}
+			_ = c.cacheRepo.SetWithMetadata(cacheKey, cacheItem)
 		}
-		_ = c.cacheRepo.SetWithMetadata(cacheKey, cacheItem)
+		w.Header().Set("ETag", newETag)
+		w.Header().Set("Last-Modified", time.Now().Format(http.TimeFormat))
+	} else {
+		fmt.Printf("[WARN] Not caching empty fixtures for %s\n", time.Now().Format("2006-01-02"))
 	}
-	w.Header().Set("ETag", newETag)
-	w.Header().Set("Last-Modified", time.Now().Format(http.TimeFormat))
 	utils.RespondWithJSON(w, http.StatusOK, fixtures)
 }
 
-// HandleGetFixturesSummary handles requests for fixtures summary
+// HandleGetFixturesSummary handles requests for fixtures summary (today, tomorrow, upcoming)
 func (c *SportsDataController) HandleGetFixturesSummary(w http.ResponseWriter, r *http.Request) {
-	competition := r.URL.Query().Get("competition")
+	competition := strings.ToUpper(r.URL.Query().Get("competition"))
 	if competition == "" {
 		http.Error(w, "competition code is required", http.StatusBadRequest)
 		return
 	}
+
 	cacheKey := fmt.Sprintf("fixtures_summary_%s", competition)
 	if cachedItem, err := c.cacheRepo.Get(cacheKey); err == nil && cachedItem != nil {
 		var summary interface{}
@@ -222,69 +263,32 @@ func (c *SportsDataController) HandleGetFixturesSummary(w http.ResponseWriter, r
 			return
 		}
 	}
+
 	summary, err := c.fixturesService.GetFixturesSummary(competition)
 	if err != nil {
 		fmt.Printf("Error fetching fixtures summary for %s: %v\n", competition, err)
 		http.Error(w, "Failed to retrieve fixtures summary", http.StatusInternalServerError)
 		return
 	}
-	newETag := fmt.Sprintf("%d", time.Now().UnixNano())
-	if summaryJSON, err := json.Marshal(summary); err == nil {
-		cacheItem := models.CacheItem{
-			Key:          cacheKey,
-			Value:        summaryJSON,
-			ETag:         newETag,
-			LastModified: time.Now(),
-			ExpiresAt:    time.Now().Add(24 * time.Hour),
-		}
-		_ = c.cacheRepo.SetWithMetadata(cacheKey, cacheItem)
-	}
-	w.Header().Set("ETag", newETag)
-	w.Header().Set("Last-Modified", time.Now().Format(http.TimeFormat))
-	utils.RespondWithJSON(w, http.StatusOK, summary)
-}
 
-// CacheMiddleware is a middleware for caching HTTP responses.
-func (c *SportsDataController) CacheMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check if the response is cached
-		cacheKey := r.URL.Path
-		cachedResponse, err := c.cacheRepo.Get(cacheKey)
-		if err != nil {
-			fmt.Printf("Error fetching from cache: %v\n", err)
-		}
-
-		if cachedResponse != nil {
-			// Serve the cached response
-			fmt.Println("Serving from cache:", cacheKey)
-			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("ETag", cachedResponse.ETag)
-			w.Header().Set("Last-Modified", cachedResponse.LastModified.Format(http.TimeFormat))
-			w.WriteHeader(http.StatusOK)
-			w.Write(cachedResponse.Value)
-			return
-		}
-
-		// If not cached, proceed with the request
-		next.ServeHTTP(w, r)
-
-		// Cache the response
-		go func() {
-			// Serialize the response body
-			var responseBody []byte
-			if r.Method == http.MethodGet {
-				responseBody, err = json.Marshal(w)
-				if err != nil {
-					fmt.Printf("Error serializing response body: %v\n", err)
-					return
-				}
-
-				// Store in cache with expiration
-				err = c.cacheRepo.Set(cacheKey, responseBody, 10*time.Minute)
-				if err != nil {
-					fmt.Printf("Error storing in cache: %v\n", err)
-				}
+	// Only cache if summary has some data (at least one non-empty array)
+	hasData := len(summary.Today) > 0 || len(summary.Tomorrow) > 0 || len(summary.Upcoming) > 0
+	if hasData {
+		newETag := fmt.Sprintf("%d", time.Now().UnixNano())
+		if summaryJSON, err := json.Marshal(summary); err == nil {
+			cacheItem := models.CacheItem{
+				Key:          cacheKey,
+				Value:        summaryJSON,
+				ETag:         newETag,
+				LastModified: time.Now(),
+				ExpiresAt:    time.Now().Add(24 * time.Hour),
 			}
-		}()
-	})
+			_ = c.cacheRepo.SetWithMetadata(cacheKey, cacheItem)
+		}
+		w.Header().Set("ETag", newETag)
+		w.Header().Set("Last-Modified", time.Now().Format(http.TimeFormat))
+	} else {
+		fmt.Printf("[WARN] Not caching empty fixtures summary for %s\n", competition)
+	}
+	utils.RespondWithJSON(w, http.StatusOK, summary)
 }
