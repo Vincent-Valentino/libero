@@ -2,3 +2,6 @@ fastapi
 uvicorn[standard]
 pydantic
 # Add other dependencies like requests, beautifulsoup4, sqlalchemy, psycopg2-binary etc. later
+pandas>=2.0.0
+scikit-learn>=1.0.0
+numpy>=1.20.0

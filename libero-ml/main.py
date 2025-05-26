@@ -6,7 +6,6 @@ import time # Keep for existing simulation
 
 # --- Configuration (Placeholder) ---
 # TODO: Load configuration from environment variables or a config file
-
 # --- Database Connection (Placeholder) ---
 # TODO: Implement logic to connect to the main application's database (read-only)
 
