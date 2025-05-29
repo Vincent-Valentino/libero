@@ -148,6 +148,11 @@ func (s *authService) LoginOrRegisterViaProvider(ctx context.Context, userInfo *
 				existingUserByEmail.Name = userInfo.Name
 				needsUpdate = true
 			}
+			// Ensure the user has a username if they don't have one (for OAuth linking)
+			if existingUserByEmail.Username == "" {
+				existingUserByEmail.Username = fmt.Sprintf("%s_%s", userInfo.Provider, userInfo.ProviderID)
+				needsUpdate = true
+			}
 			// Add other fields to potentially update here
 
 			if needsUpdate {
@@ -163,14 +168,37 @@ func (s *authService) LoginOrRegisterViaProvider(ctx context.Context, userInfo *
 
 	// 4. If user still not found, create a new user.
 	// TODO: Add structured logging (AuthService: Creating new user for provider %s, email %s, userInfo.Provider, userInfo.Email)
+
+	// For GitHub users without email, generate a placeholder email
+	email := userInfo.Email
+	if email == "" && userInfo.Provider == "github" {
+		// Create a placeholder email for GitHub users who don't provide email
+		email = fmt.Sprintf("%s+github@noemail.local", userInfo.ProviderID)
+	}
+
+	// Validate we have required fields for user creation
+	if email == "" {
+		return "", fmt.Errorf("cannot create user without email address for provider %s", userInfo.Provider)
+	}
+
+	if userInfo.Name == "" {
+		// Use provider ID as fallback name
+		userInfo.Name = fmt.Sprintf("%s_user_%s", userInfo.Provider, userInfo.ProviderID)
+	}
+
+	// Generate a unique username for OAuth users to avoid database constraint violations
+	// Format: provider_providerID (e.g., google_123456789, github_987654321)
+	generatedUsername := fmt.Sprintf("%s_%s", userInfo.Provider, userInfo.ProviderID)
+
 	newUser := &models.User{
-		Email:      userInfo.Email, // Ensure email is not empty if required by DB schema
-		Name:       userInfo.Name,  // Ensure name is not empty if required
+		Email:      email,             // Use processed email (may be placeholder for GitHub)
+		Username:   generatedUsername, // Generate unique username for OAuth users
+		Name:       userInfo.Name,     // Ensure name is not empty
 		Provider:   userInfo.Provider,
 		ProviderID: userInfo.ProviderID,
 		Role:       "user", // Default role
 		Active:     true,   // Default active
-		// Password will be empty/nil initially for OAuth users.
+		// Password will be empty for OAuth users (now nullable in model)
 	}
 	// Use CreateUser which should handle basic creation.
 	createdUser, createErr := s.userService.CreateUser(ctx, newUser)

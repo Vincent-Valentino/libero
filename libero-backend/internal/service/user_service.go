@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"libero-backend/config"               // Added config import
-	"libero-backend/internal/models"      // Assuming user model is here
+	"libero-backend/config"              // Added config import
+	"libero-backend/internal/models"     // Assuming user model is here
 	"libero-backend/internal/repository" // Assuming repository interface is here
 )
 
@@ -20,9 +20,9 @@ type UserService interface {
 	UpdateUser(ctx context.Context, user *models.User) error
 
 	// Used by UserController
-	RegisterUser(user *models.User) error                                     // Used in Register handler
-	LoginUser(email, password string) (string, error)                         // Used in Login handler (returns token)
-	GetUserByID(id uint) (*models.User, error)                                // Used in GetProfile, GetUser handlers
+	RegisterUser(user *models.User) error             // Used in Register handler
+	LoginUser(email, password string) (string, error) // Used in Login handler (returns token)
+	GetUserByID(id uint) (*models.User, error)        // Used in GetProfile, GetUser handlers
 	// UpdateUser signature kept as is for now, controller call needs fixing
 	ListUsers(page, limit int) ([]models.User, int64, error) // Used in ListUsers handler
 	DeleteUser(id uint) error                                // Used in DeleteUser handler
@@ -47,13 +47,8 @@ func NewUserService(userRepo repository.UserRepository, cfg *config.Config) User
 // FindUserByID finds a user by their internal ID.
 // GetUserByID finds a user by their internal ID. (Renamed from FindUserByID)
 func (s *userService) GetUserByID(id uint) (*models.User, error) {
-	fmt.Printf("UserService: Finding user by ID: %d\n", id)
-	// Placeholder: Replace with actual repository call
-	// return s.userRepo.FindByID(ctx, id)
-	if id == 1 { // Dummy user
-		return &models.User{ID: 1, Email: "dummy@example.com", Name: "Dummy User"}, nil
-	}
-	return nil, errors.New("user not found (placeholder)")
+	// Call the repository method instead of placeholder
+	return s.userRepo.FindByID(id)
 }
 
 // FindUserByEmail finds a user by their email address.

@@ -9,19 +9,19 @@ import (
 
 // User represents the user data model
 type User struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	Email     string    `gorm:"uniqueIndex;not null" json:"email"`
-	Username  string    `gorm:"uniqueIndex;not null" json:"username"`
-	Name      string    `json:"name,omitempty"` // Display name, potentially from OAuth
-	Password  string    `gorm:"not null" json:"-"` // Password is not exposed in JSON
-	Role      string    `gorm:"default:user" json:"role"` // user, admin, etc.
-	Active    bool      `gorm:"default:true" json:"active"`
-	Provider  string    `gorm:"index" json:"-"` // OAuth Provider (e.g., google), indexed
-	ProviderID string   `gorm:"index" json:"-"` // User ID from the OAuth provider, indexed
+	ID         uint   `gorm:"primaryKey" json:"id"`
+	Email      string `gorm:"uniqueIndex;not null" json:"email"`
+	Username   string `gorm:"uniqueIndex" json:"username"` // Removed not null for OAuth users
+	Name       string `json:"name,omitempty"`              // Display name, potentially from OAuth
+	Password   string `json:"-"`                           // Removed not null for OAuth users, Password is not exposed in JSON
+	Role       string `gorm:"default:user" json:"role"`    // user, admin, etc.
+	Active     bool   `gorm:"default:true" json:"active"`
+	Provider   string `gorm:"index" json:"-"` // OAuth Provider (e.g., google), indexed
+	ProviderID string `gorm:"index" json:"-"` // User ID from the OAuth provider, indexed
 
 	// Password reset fields
-	ResetToken         string    `gorm:"index" json:"-"` // Password reset token
-	ResetTokenExpiresAt time.Time `json:"-"` // When the reset token expires
+	ResetToken          string    `gorm:"index" json:"-"` // Password reset token
+	ResetTokenExpiresAt time.Time `json:"-"`              // When the reset token expires
 
 	// Relationships for Preferences
 	FollowedTeams        []*Team        `gorm:"many2many:user_followed_teams;" json:"followed_teams,omitempty"`
@@ -78,10 +78,10 @@ func (u *User) ToResponse() UserResponse {
 
 // UpdatePreferencesRequest defines the structure for the PUT /api/users/preferences request body.
 type UpdatePreferencesRequest struct {
-	AddTeams    []uint `json:"add_teams"`    // IDs of teams to follow
-	RemoveTeams []uint `json:"remove_teams"` // IDs of teams to unfollow
-	AddPlayers    []uint `json:"add_players"`    // IDs of players to follow
-	RemovePlayers []uint `json:"remove_players"` // IDs of players to unfollow
+	AddTeams           []uint `json:"add_teams"`           // IDs of teams to follow
+	RemoveTeams        []uint `json:"remove_teams"`        // IDs of teams to unfollow
+	AddPlayers         []uint `json:"add_players"`         // IDs of players to follow
+	RemovePlayers      []uint `json:"remove_players"`      // IDs of players to unfollow
 	AddCompetitions    []uint `json:"add_competitions"`    // IDs of competitions to follow
 	RemoveCompetitions []uint `json:"remove_competitions"` // IDs of competitions to unfollow
 }
@@ -115,8 +115,8 @@ type UserPreferencesResponse struct {
 
 // UserProfileResponse defines the structure for the GET /api/users/profile response body.
 type UserProfileResponse struct {
-	ID          uint                  `json:"id"`
-	Name        string                `json:"name"`
-	Email       string                `json:"email"`
+	ID          uint                    `json:"id"`
+	Name        string                  `json:"name"`
+	Email       string                  `json:"email"`
 	Preferences UserPreferencesResponse `json:"preferences"`
 }

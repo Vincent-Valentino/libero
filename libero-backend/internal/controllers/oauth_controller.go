@@ -3,7 +3,8 @@ package controllers
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"libero-backend/config" 
+	"fmt"
+	"libero-backend/config"
 	"libero-backend/internal/service"
 	"net/http"
 	// Keep necessary imports like net/http, encoding/base64, service
@@ -12,7 +13,7 @@ import (
 // OAuthController handles OAuth authentication requests
 type OAuthController struct {
 	oauthService service.OAuthService // Only depends on the OAuthService interface
-	cfg          *config.Config     // Added config dependency
+	cfg          *config.Config       // Added config dependency
 }
 
 // NewOAuthController creates a new OAuthController instance
@@ -47,8 +48,12 @@ func generateStateOauthCookie(w http.ResponseWriter) string {
 // GoogleLogin initiates the Google OAuth flow
 func (ctrl *OAuthController) GoogleLogin(w http.ResponseWriter, r *http.Request) {
 	url, state := ctrl.oauthService.GetGoogleLoginURL()
+	if url == "" || state == "" {
+		http.Error(w, "Google OAuth is not properly configured", http.StatusServiceUnavailable)
+		return
+	}
 	http.SetCookie(w, &http.Cookie{
-		Name:     "oauthstate", Value: state, MaxAge: 3600, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode,
+		Name: "oauthstate", Value: state, MaxAge: 3600, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode,
 	})
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
@@ -69,20 +74,28 @@ func (ctrl *OAuthController) GoogleCallback(w http.ResponseWriter, r *http.Reque
 
 	code := r.FormValue("code")
 	if code == "" {
+		// Check for error parameter from OAuth provider
+		oauthError := r.FormValue("error")
+		if oauthError != "" {
+			errorDescription := r.FormValue("error_description")
+			http.Error(w, fmt.Sprintf("OAuth error: %s - %s", oauthError, errorDescription), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, "authorization code missing", http.StatusBadRequest)
 		return
 	}
 
 	tokenString, err := ctrl.oauthService.HandleGoogleCallback(r.Context(), oauthStateCookie.Value, receivedState, code)
 	if err != nil {
-		// TODO: Replace with proper logging
-		http.Error(w, "Authentication failed.", http.StatusInternalServerError)
+		// Log the actual error for debugging
+		fmt.Printf("Google OAuth error: %v\n", err)
+		http.Error(w, "Google authentication failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Redirect back to frontend with token in hash fragment
 	redirectURL := ctrl.cfg.FrontendURL + "/auth/callback#token=" + tokenString
- // Use ctrl.cfg.FrontendURL
+	// Use ctrl.cfg.FrontendURL
 	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
@@ -124,7 +137,7 @@ func (ctrl *OAuthController) FacebookCallback(w http.ResponseWriter, r *http.Req
 
 	// Redirect back to frontend with token in hash fragment
 	redirectURL := ctrl.cfg.FrontendURL + "/auth/callback#token=" + tokenString
- // Use ctrl.cfg.FrontendURL
+	// Use ctrl.cfg.FrontendURL
 	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
@@ -133,6 +146,10 @@ func (ctrl *OAuthController) FacebookCallback(w http.ResponseWriter, r *http.Req
 // GitHubLogin initiates the GitHub OAuth flow
 func (ctrl *OAuthController) GitHubLogin(w http.ResponseWriter, r *http.Request) {
 	url, state := ctrl.oauthService.GetGitHubLoginURL()
+	if url == "" || state == "" {
+		http.Error(w, "GitHub OAuth is not properly configured", http.StatusServiceUnavailable)
+		return
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name: "oauthstate", Value: state, MaxAge: 3600, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode,
 	})
@@ -153,20 +170,28 @@ func (ctrl *OAuthController) GitHubCallback(w http.ResponseWriter, r *http.Reque
 	}
 	code := r.FormValue("code")
 	if code == "" {
+		// Check for error parameter from OAuth provider
+		oauthError := r.FormValue("error")
+		if oauthError != "" {
+			errorDescription := r.FormValue("error_description")
+			http.Error(w, fmt.Sprintf("OAuth error: %s - %s", oauthError, errorDescription), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, "authorization code missing", http.StatusBadRequest)
 		return
 	}
 
 	tokenString, err := ctrl.oauthService.HandleGitHubCallback(r.Context(), oauthStateCookie.Value, receivedState, code)
 	if err != nil {
-		// TODO: Replace with proper logging
-		http.Error(w, "Authentication failed.", http.StatusInternalServerError)
+		// Log the actual error for debugging
+		fmt.Printf("GitHub OAuth error: %v\n", err)
+		http.Error(w, "GitHub authentication failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Redirect back to frontend with token in hash fragment
 	redirectURL := ctrl.cfg.FrontendURL + "/auth/callback#token=" + tokenString
- // Use ctrl.cfg.FrontendURL
+	// Use ctrl.cfg.FrontendURL
 	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
