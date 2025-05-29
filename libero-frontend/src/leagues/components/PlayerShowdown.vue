@@ -33,13 +33,6 @@
       >
         <div class="flex items-center space-x-3">
           <span class="font-semibold text-gray-500 w-5 text-right">{{ index + 1 }}.</span>
-          <img
-            v-if="player.photo"
-            loading="lazy"
-            :src="player.photo"
-            :alt="player.name"
-            class="h-8 w-8 rounded-full object-cover border"
-          >
           <div>
             <div class="font-medium text-sm">{{ player.name }}</div>
             <div class="text-xs text-gray-500">{{ player.team.name }}</div>

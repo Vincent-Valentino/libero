@@ -419,9 +419,9 @@ interface BackendCompetitionStandingsDTO {
       position: number;
       team_name: string;
       team_crest: string;
-      played_games: number;  // Changed from played to match backend
+      played: number;  // Fixed: backend returns "played", not "played_games"
       won: number;
-      draw: number;  // Changed from drawn to match backend
+      drawn: number;  // Fixed: backend returns "drawn", not "draw"
       lost: number;
       goals_for: number;
       goals_against: number;
@@ -454,9 +454,9 @@ export const getStandings = async (competitionCode: string): Promise<LeagueTable
       name: row.team_name,
       logo: row.team_crest,
     },
-    played: row.played_games,  // Match backend field
+    played: row.played,  // Fixed: match corrected backend field
     won: row.won,
-    drawn: row.draw,  // Match backend field
+    drawn: row.drawn,  // Fixed: match corrected backend field
     lost: row.lost,
     goalsFor: row.goals_for,
     goalsAgainst: row.goals_against,
@@ -499,4 +499,98 @@ export const getTopScorers = async (competitionCode: string): Promise<PlayerStat
   }
 };
 
+// --- Prediction DTOs ---
+export interface PredictMatchRequest {
+  league: string;
+  home_team: string;
+  away_team: string;
+}
+
+export interface PredictMatchResponse {
+  prediction: number;
+  probabilities: {
+    home_win: number;
+    draw: number;
+    away_win: number;
+  };
+  expected_home_goals: number;
+  expected_away_goals: number;
+  most_likely_home_score: number;
+  most_likely_away_score: number;
+}
+
+// --- Top Scorers DTO ---
+export interface TopScorerDTO {
+  id: number;
+  name: string;
+  team: {
+    id: number;
+    name: string;
+    logo: string;
+  };
+  value: number; // goals, assists, or clean sheets
+}
+
 export default apiClient;
+
+// --- Match Prediction API Functions ---
+
+/**
+ * Predict the outcome of a football match
+ * @param request - match prediction request with league, home_team, and away_team
+ * @returns Promise containing the prediction response with scores and probabilities
+ */
+export const predictMatch = async (request: PredictMatchRequest): Promise<PredictMatchResponse> => {
+  try {
+    console.log('[API] Predicting match:', request);
+    const response = await apiClient.post<PredictMatchResponse>('/predict/match', request);
+    console.log('[API] Prediction response:', response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('Error predicting match:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get list of available teams from the ML service
+ * @returns Promise containing array of team names
+ */
+export const getAvailableTeams = async (): Promise<string[]> => {
+  try {
+    console.log('[API] Fetching available teams');
+    const response = await apiClient.get<{ teams: string[] }>('/predict/teams');
+    console.log('[API] Available teams:', response.data.teams);
+    return response.data.teams;
+  } catch (error: any) {
+    console.error('Error fetching teams:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get list of available leagues from the ML service
+ * @returns Promise containing array of league names
+ */
+export const getAvailableLeagues = async (): Promise<string[]> => {
+  try {
+    console.log('[API] Fetching available leagues');
+    const response = await apiClient.get<{ leagues: string[] }>('/predict/leagues');
+    console.log('[API] Available leagues:', response.data.leagues);
+    return response.data.leagues;
+  } catch (error: any) {
+    console.error('Error fetching leagues:', error);
+    throw error;
+  }
+};
+
+// Get upcoming matches for team following
+export const getUpcomingMatches = async (): Promise<CompetitionFixturesDTO[]> => {
+  try {
+    const response = await apiClient.get('/matches/upcoming');
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching upcoming matches:', error);
+    throw new Error(`Failed to fetch upcoming matches: ${error.response?.data?.message || error.message}`);
+  }
+};

@@ -1,201 +1,266 @@
-from fastapi import FastAPI, BackgroundTasks, HTTPException, Query
-from pydantic import BaseModel, Field
-from typing import List, Optional
-import datetime
-import time # Keep for existing simulation
+"""
+FastAPI microservice for football match prediction using Poisson regression models.
+Provides exact score predictions based on team form and historical data.
+"""
 
-# --- Configuration (Placeholder) ---
-# TODO: Load configuration from environment variables or a config file
-# --- Database Connection (Placeholder) ---
-# TODO: Implement logic to connect to the main application's database (read-only)
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional, Dict, Any
+import uvicorn
+import os
+import logging
+from datetime import datetime
 
-# --- Existing Scraping Logic (Placeholder) ---
-# ... (Keep existing placeholder functions like scrape_team_data, etc. if needed for other parts, or remove if solely focused on new endpoints) ...
+# Import our Poisson-based prediction modules
+from model import SoccerPredictor
+from predict_match import predict_match_result
 
-# --- NEW: Data Models (Pydantic) ---
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-class Match(BaseModel):
-    id: str = Field(..., example="match_123")
-    competition: str = Field(..., example="Premier League")
-    home_team: str = Field(..., example="Team A")
-    away_team: str = Field(..., example="Team B")
-    date: datetime.datetime = Field(..., example=datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=1))
-    status: str = Field(..., example="scheduled") # e.g., scheduled, live, finished
+# Global variable to store the trained predictor
+predictor = None
 
-class Result(Match):
-    home_score: int = Field(..., example=2)
-    away_score: int = Field(..., example=1)
-    possession_home: Optional[float] = Field(None, example=60.5)
-    possession_away: Optional[float] = Field(None, example=39.5)
-    status: str = Field(default="finished", example="finished")
-
-class PlayerStats(BaseModel):
-    player_id: str = Field(..., example="player_007")
-    player_name: str = Field(..., example="James Doe")
-    season: str = Field(..., example="2024/2025")
-    appearances: int = Field(..., example=15)
-    goals: int = Field(..., example=5)
-    assists: int = Field(..., example=3)
-
-# --- NEW: Placeholder Data Fetching Logic ---
-
-# Hardcoded data for demonstration
-_upcoming_matches_db = [
-    Match(id="match_101", competition="Champions League", home_team="Real Madrid", away_team="Bayern Munich", date=datetime.datetime(2025, 5, 10, 19, 0, 0, tzinfo=datetime.timezone.utc), status="scheduled"),
-    Match(id="match_102", competition="Premier League", home_team="Liverpool", away_team="Man City", date=datetime.datetime(2025, 5, 12, 15, 0, 0, tzinfo=datetime.timezone.utc), status="scheduled"),
-    Match(id="match_103", competition="Premier League", home_team="Arsenal", away_team="Chelsea", date=datetime.datetime(2025, 5, 12, 17, 30, 0, tzinfo=datetime.timezone.utc), status="scheduled"),
-]
-
-_results_db = [
-    Result(id="match_098", competition="Premier League", home_team="Man Utd", away_team="Spurs", date=datetime.datetime(2025, 5, 5, 14, 0, 0, tzinfo=datetime.timezone.utc), status="finished", home_score=2, away_score=2, possession_home=55.1, possession_away=44.9),
-    Result(id="match_099", competition="La Liga", home_team="Barcelona", away_team="Atletico Madrid", date=datetime.datetime(2025, 5, 6, 20, 0, 0, tzinfo=datetime.timezone.utc), status="finished", home_score=1, away_score=0, possession_home=65.0, possession_away=35.0),
-]
-
-_player_stats_db = {
-    "player_001": PlayerStats(player_id="player_001", player_name="Leo Messi", season="2024/2025", appearances=20, goals=15, assists=10),
-    "player_007": PlayerStats(player_id="player_007", player_name="Cristiano Ronaldo", season="2024/2025", appearances=22, goals=18, assists=5),
-}
-
-def fetch_upcoming_matches(competition_id: Optional[str] = None, team_id: Optional[str] = None) -> List[Match]:
-    """Placeholder: Returns a static list of upcoming matches."""
-    # TODO: Implement actual filtering logic if needed
-    print(f"Fetching upcoming matches (Placeholder). Filters - Competition: {competition_id}, Team: {team_id}")
-    # In a real scenario, filter _upcoming_matches_db based on competition_id/team_id
-    return _upcoming_matches_db
-
-def fetch_results(competition_id: Optional[str] = None, team_id: Optional[str] = None) -> List[Result]:
-    """Placeholder: Returns a static list of match results."""
-    # TODO: Implement actual filtering logic if needed
-    print(f"Fetching results (Placeholder). Filters - Competition: {competition_id}, Team: {team_id}")
-    # In a real scenario, filter _results_db based on competition_id/team_id
-    return _results_db
-
-def fetch_player_stats(player_id: str) -> Optional[PlayerStats]:
-    """Placeholder: Returns static stats for a specific player."""
-    print(f"Fetching stats for player {player_id} (Placeholder).")
-    return _player_stats_db.get(player_id)
-
-
-# --- FastAPI Application ---
+# FastAPI app initialization
 app = FastAPI(
-    title="Libero ML Data Service",
-    description="Microservice to acquire, preprocess, and serve sports data.",
-    version="0.2.0", # Incremented version
+    title="Football Score Predictor API",
+    description="Poisson-based football score prediction with exact scores and probabilities",
+    version="1.0.0"
 )
 
-# --- State (Simple In-Memory for Scraper) ---
-# Keep the existing scraper status logic if the old endpoints are still relevant
-scraper_status = {
-    "status": "idle",
-    "last_run_start_time": None,
-    "last_run_end_time": None,
-    "last_run_status": None,
-    "error_message": None,
-}
+# Add CORS middleware for cross-origin requests
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify your frontend domain
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# --- Models (Existing + New) ---
-class ScrapeTriggerRequest(BaseModel):
-    target: str | None = None
+# Request/Response models
+class PredictionRequest(BaseModel):
+    league: str
+    home_team: str
+    away_team: str
+    stats: Optional[Dict[str, Any]] = None
 
-class StatusResponse(BaseModel):
-    status: str
-    last_run_start_time: datetime.datetime | None
-    last_run_end_time: datetime.datetime | None
-    last_run_status: str | None
-    error_message: str | None
+class PredictionResponse(BaseModel):
+    prediction: int
+    probabilities: Dict[str, float]
+    expected_home_goals: float
+    expected_away_goals: float
+    most_likely_home_score: int
+    most_likely_away_score: int
 
-# --- Background Task Function (Existing) ---
-def trigger_scrape_background(request_data: ScrapeTriggerRequest):
-    """Function to run the scraping process in the background."""
-    global scraper_status
-    start_time = datetime.datetime.now(datetime.timezone.utc)
-    scraper_status.update({
-        "status": "running",
-        "last_run_start_time": start_time,
-        "last_run_end_time": None,
-        "last_run_status": None,
-        "error_message": None,
-    })
-    print(f"Background scrape triggered at {start_time} with target: {request_data.target}")
+# Startup event to load and train model
+@app.on_event("startup")
+async def startup_event():
+    global predictor
     try:
-        print("Simulating scraping work...")
-        time.sleep(5) # Simulate work
-        end_time = datetime.datetime.now(datetime.timezone.utc)
-        scraper_status.update({
-            "status": "idle",
-            "last_run_end_time": end_time,
-            "last_run_status": "success",
-        })
-        print(f"Background scrape finished successfully at {end_time}")
+        logger.info("🚀 Loading and training Poisson-based football predictor...")
+        
+        # Initialize and train the predictor
+        predictor = SoccerPredictor()
+        predictor.load_data()
+        predictor.train()
+        
+        logger.info("✅ Model training completed successfully!")
+        
+        # Run debug and test functions
+        debug_model_features()
+        test_predictions()
+        
     except Exception as e:
-        end_time = datetime.datetime.now(datetime.timezone.utc)
-        error_msg = f"Scraping failed: {e}"
-        print(error_msg)
-        scraper_status.update({
-            "status": "idle",
-            "last_run_end_time": end_time,
-            "last_run_status": "failed",
-            "error_message": error_msg,
-        })
+        logger.error(f"❌ Failed to initialize predictor: {e}")
+        import traceback
+        traceback.print_exc()
+        raise e
 
-# --- API Endpoints (Existing + New) ---
+@app.get("/")
+async def root():
+    """Health check endpoint"""
+    return {
+        "message": "⚽ Football Score Predictor API",
+        "status": "running",
+        "model_ready": predictor is not None
+    }
 
-# Existing Scraper Endpoints
-@app.get("/status", response_model=StatusResponse, tags=["Scraper Control"])
-async def get_status():
-    """Returns the current status of the background scraper."""
-    return scraper_status
-
-@app.post("/scrape", status_code=202, tags=["Scraper Control"])
-async def trigger_scrape(
-    request_data: ScrapeTriggerRequest,
-    background_tasks: BackgroundTasks
-):
-    """Triggers a data scraping cycle in the background (Placeholder)."""
-    global scraper_status
-    if scraper_status["status"] == "running":
-        raise HTTPException(status_code=409, detail="Scraping process is already running.")
-    background_tasks.add_task(trigger_scrape_background, request_data)
-    return {"message": "Scraping process initiated in the background."}
-
-# --- NEW: Sports Data Endpoints ---
-
-@app.get("/matches/upcoming", response_model=List[Match], tags=["Sports Data"])
-async def get_upcoming_matches(
-    competition_id: Optional[str] = Query(None, description="Filter by competition ID"),
-    team_id: Optional[str] = Query(None, description="Filter by team ID")
-):
+@app.post("/predict", response_model=PredictionResponse)
+async def predict_match(request: PredictionRequest):
     """
-    Retrieves a list of upcoming matches (placeholder data).
-    Allows filtering by competition_id or team_id.
+    Predict football match outcome using Poisson regression models
     """
-    matches = fetch_upcoming_matches(competition_id=competition_id, team_id=team_id)
-    return matches
+    global predictor
+    
+    if predictor is None:
+        raise HTTPException(
+            status_code=503, 
+            detail="Model not ready. Please wait for training to complete."
+        )
+    
+    try:
+        # Make prediction using the trained model
+        result = predict_match_result(
+            predictor=predictor,
+            league=request.league,
+            home_team=request.home_team,
+            away_team=request.away_team,
+            stats=request.stats
+        )
+        
+        logger.info(f"🔮 Prediction made: {request.home_team} vs {request.away_team}")
+        return PredictionResponse(**result)
+        
+    except Exception as e:
+        logger.error(f"❌ Prediction error: {e}")
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
-@app.get("/matches/results", response_model=List[Result], tags=["Sports Data"])
-async def get_results(
-    competition_id: Optional[str] = Query(None, description="Filter by competition ID"),
-    team_id: Optional[str] = Query(None, description="Filter by team ID")
-):
+@app.get("/teams")
+async def get_available_teams():
     """
-    Retrieves a list of recent match results (placeholder data).
-    Allows filtering by competition_id or team_id.
+    Get list of all available teams in the dataset
     """
-    results = fetch_results(competition_id=competition_id, team_id=team_id)
-    return results
+    global predictor
+    
+    if predictor is None:
+        raise HTTPException(
+            status_code=503, 
+            detail="Model not ready. Please wait for training to complete."
+        )
+    
+    try:
+        teams = predictor.get_available_teams()
+        return {"teams": teams}
+    except Exception as e:
+        logger.error(f"❌ Error getting teams: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get teams: {str(e)}")
 
-@app.get("/players/{player_id}/stats", response_model=PlayerStats, tags=["Sports Data"])
-async def get_player_stats(player_id: str):
+@app.get("/leagues")
+async def get_available_leagues():
     """
-    Retrieves statistics for a specific player (placeholder data).
+    Get list of all available leagues in the dataset
     """
-    stats = fetch_player_stats(player_id=player_id)
-    if stats is None:
-        raise HTTPException(status_code=404, detail=f"Stats not found for player_id: {player_id}")
-    return stats
+    global predictor
+    
+    if predictor is None:
+        raise HTTPException(
+            status_code=503, 
+            detail="Model not ready. Please wait for training to complete."
+        )
+    
+    try:
+        leagues = predictor.get_available_leagues()
+        return {"leagues": leagues}
+    except Exception as e:
+        logger.error(f"❌ Error getting leagues: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get leagues: {str(e)}")
 
-# --- Main Execution ---
+@app.get("/health")
+async def health_check():
+    """
+    Detailed health check with model status
+    """
+    return {
+        "status": "healthy",
+        "model_loaded": predictor is not None,
+        "timestamp": datetime.now().isoformat(),
+        "service": "football-predictor-ml"
+    }
+
+def test_predictions():
+    """Test function to debug prediction results"""
+    print("\n" + "="*60)
+    print("🧪 TESTING PREDICTION SYSTEM")
+    print("="*60)
+    
+    # Test matchups
+    test_cases = [
+        ("D1", "Bayern Munich", "Borussia Dortmund"),
+        ("SP1", "Barcelona", "Alaves"), 
+        ("SP1", "Alaves", "Barcelona"),
+        ("E0", "Arsenal", "Angers"),
+        ("E0", "Bayern Munich", "Arsenal")  # Cross-league
+    ]
+    
+    for league, home_team, away_team in test_cases:
+        print(f"\n🔮 Testing: {home_team} vs {away_team} ({league})")
+        print("-" * 50)
+        
+        try:
+            # Make prediction
+            result = predictor.predict_match(league, home_team, away_team)
+            
+            # Print detailed results
+            print(f"📊 Expected Goals: {result['expected_home_goals']:.2f} - {result['expected_away_goals']:.2f}")
+            print(f"🎯 Most Likely Score: {result['most_likely_home_score']} - {result['most_likely_away_score']}")
+            print(f"📈 Outcome Probabilities:")
+            print(f"   🏠 {home_team} Win: {result['probabilities']['home_win']:.1%}")
+            print(f"   🤝 Draw: {result['probabilities']['draw']:.1%}")
+            print(f"   ✈️  {away_team} Win: {result['probabilities']['away_win']:.1%}")
+            
+            # Determine predicted outcome
+            if result['prediction'] == 1:
+                outcome = f"🏠 {home_team} Win"
+            elif result['prediction'] == -1:
+                outcome = f"✈️ {away_team} Win"
+            else:
+                outcome = "🤝 Draw"
+            print(f"🏆 Predicted Outcome: {outcome}")
+            
+        except Exception as e:
+            print(f"❌ Error predicting {home_team} vs {away_team}: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    print("\n" + "="*60)
+    print("🧪 TESTING COMPLETED")
+    print("="*60)
+
+def debug_model_features():
+    """Debug function to show model features and data"""
+    print("\n" + "="*60)
+    print("🔍 MODEL DEBUG INFORMATION")
+    print("="*60)
+    
+    print(f"\n📊 Dataset Info:")
+    print(f"   Total matches: {len(predictor.data)}")
+    print(f"   Date range: {predictor.data['Date'].min()} to {predictor.data['Date'].max()}")
+    print(f"   Leagues: {', '.join(predictor.data['Div'].unique())}")
+    
+    print(f"\n🏠 Home Features ({len(predictor.home_features)}):")
+    for i, feature in enumerate(predictor.home_features):
+        print(f"   {i+1:2d}. {feature}")
+    
+    print(f"\n✈️  Away Features ({len(predictor.away_features)}):")
+    for i, feature in enumerate(predictor.away_features):
+        print(f"   {i+1:2d}. {feature}")
+    
+    # Check for enhanced features
+    enhanced_features = ['market_home_prob', 'shot_ratio', 'corner_ratio', 'foul_ratio']
+    print(f"\n🚀 Enhanced Features Status:")
+    for feature in enhanced_features:
+        status = "✅" if feature in predictor.data.columns else "❌"
+        print(f"   {status} {feature}")
+    
+    # Sample some recent data
+    print(f"\n📈 Sample Recent Data (last 5 matches):")
+    recent_data = predictor.data.tail(5)[['Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG']]
+    for _, match in recent_data.iterrows():
+        print(f"   {match['Date'].strftime('%Y-%m-%d')}: {match['HomeTeam']} {match['FTHG']}-{match['FTAG']} {match['AwayTeam']}")
+    
+    print("\n" + "="*60)
+
 if __name__ == "__main__":
-    import uvicorn
-    # Port 8001 is often used for ML services to avoid conflict with backend (e.g., 8000)
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    # Start the server - model initialization happens in startup_event
+    logger.info("🚀 Starting Football Prediction API...")
+    logger.info("📈 Model will be trained automatically on startup...")
+    
+    # Start the server
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8001,
+        log_level="info"
+    )

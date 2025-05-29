@@ -6,27 +6,27 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"libero-backend/config" // Added for JWT config
+	"libero-backend/config"          // Added for JWT config
 	"libero-backend/internal/models" // Added for User model
 	"time"                           // Added for JWT expiration
 
 	"github.com/golang-jwt/jwt/v5" // Added JWT library
+	"gorm.io/gorm"                 // Added GORM for error checking
 )
 
 // Predefined errors for authentication
 var (
-	ErrInvalidCredentials = errors.New("invalid email or password")
-	ErrUserNotFound       = errors.New("user not found") // Potentially replace with specific repo error check
-	ErrTokenInvalid       = errors.New("invalid or expired token")
-	ErrAccountInactive    = errors.New("user account is inactive")
-	ErrPasswordMismatch   = errors.New("new password doesn't match confirmation")
-	ErrSamePassword       = errors.New("new password cannot be the same as the current password")
-	ErrWeakPassword       = errors.New("password does not meet security requirements")
-	ErrEmailAlreadyExists = errors.New("email address already in use")
-	ErrUsernameAlreadyExists = errors.New("username already in use") 
-	ErrResetTokenInvalid  = errors.New("reset token is invalid or has expired")
+	ErrInvalidCredentials    = errors.New("invalid email or password")
+	ErrUserNotFound          = errors.New("user not found") // Potentially replace with specific repo error check
+	ErrTokenInvalid          = errors.New("invalid or expired token")
+	ErrAccountInactive       = errors.New("user account is inactive")
+	ErrPasswordMismatch      = errors.New("new password doesn't match confirmation")
+	ErrSamePassword          = errors.New("new password cannot be the same as the current password")
+	ErrWeakPassword          = errors.New("password does not meet security requirements")
+	ErrEmailAlreadyExists    = errors.New("email address already in use")
+	ErrUsernameAlreadyExists = errors.New("username already in use")
+	ErrResetTokenInvalid     = errors.New("reset token is invalid or has expired")
 )
-
 
 // AuthService defines the interface for authentication operations.
 type AuthService interface {
@@ -37,10 +37,10 @@ type AuthService interface {
 	// Added methods for password login and JWT validation
 	LoginByPassword(ctx context.Context, email, password string) (string, error)
 	ValidateJWTToken(tokenString string) (*JWTClaims, error)
-	
+
 	// Password registration
 	RegisterByPassword(ctx context.Context, user *models.User) error
-	
+
 	// Password management
 	ChangePassword(ctx context.Context, userID uint, currentPassword, newPassword, confirmPassword string) error
 	RequestPasswordReset(ctx context.Context, email string) (string, error)
@@ -108,18 +108,16 @@ func (s *authService) generateJWTToken(user *models.User) (string, error) {
 	return tokenString, nil
 }
 
-
 // --- Interface Implementations ---
 
 // LoginOrRegisterViaProvider implements the logic to find an existing user
 // based on provider info or create a new one, returning a JWT.
 func (s *authService) LoginOrRegisterViaProvider(ctx context.Context, userInfo *UserInfo) (string, error) {
 	// 1. Check if user exists by ProviderID
-	// TODO: Replace placeholder error check with proper error type checking (e.g., errors.Is(err, gorm.ErrRecordNotFound))
 	user, err := s.userService.FindUserByProvider(ctx, userInfo.Provider, userInfo.ProviderID)
-	if err != nil && err.Error() != "user not found (placeholder)" { // Assuming placeholder error for now
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) { // Use errors.Is
 		// TODO: Add structured logging (Error finding user by provider %s (%s): %v, userInfo.Provider, userInfo.ProviderID, err)
-		return "", fmt.Errorf("database error checking provider identity")
+		return "", fmt.Errorf("database error checking provider identity: %w", err)
 	}
 
 	// 2. If user exists by ProviderID, generate token.
@@ -133,11 +131,10 @@ func (s *authService) LoginOrRegisterViaProvider(ctx context.Context, userInfo *
 
 	// 3. If user does not exist by ProviderID, check by Email (if available)
 	if userInfo.Email != "" {
-		// TODO: Replace placeholder error check with proper error type checking
 		existingUserByEmail, emailErr := s.userService.FindUserByEmail(ctx, userInfo.Email)
-		if emailErr != nil && emailErr.Error() != "user not found (placeholder)" { // Assuming placeholder error for now
+		if emailErr != nil && !errors.Is(emailErr, gorm.ErrRecordNotFound) { // Use errors.Is
 			// TODO: Add structured logging (Error finding user by email %s: %v, userInfo.Email, emailErr)
-			return "", fmt.Errorf("database error checking email")
+			return "", fmt.Errorf("database error checking email: %w", emailErr)
 		}
 
 		if existingUserByEmail != nil {
@@ -179,7 +176,7 @@ func (s *authService) LoginOrRegisterViaProvider(ctx context.Context, userInfo *
 	createdUser, createErr := s.userService.CreateUser(ctx, newUser)
 	if createErr != nil {
 		// TODO: Add structured logging (Error creating new user for provider %s: %v, userInfo.Provider, createErr)
-		return "", fmt.Errorf("failed to create new user")
+		return "", fmt.Errorf("failed to create new user: %w", createErr)
 	}
 	// TODO: Add structured logging (AuthService: Created new user with ID: %d, createdUser.ID)
 
@@ -202,7 +199,7 @@ func (s *authService) LoginByPassword(ctx context.Context, email, password strin
 	}
 
 	if user == nil {
-	    return "", ErrInvalidCredentials
+		return "", ErrInvalidCredentials
 	}
 
 	// Compare the provided password with the stored hash
@@ -276,7 +273,7 @@ func (s *authService) RegisterByPassword(ctx context.Context, user *models.User)
 	if err == nil && existingUser != nil {
 		return ErrEmailAlreadyExists
 	}
-	
+
 	// Check if username already exists
 	if user.Username != "" {
 		existingUser, err = s.userService.FindUserByUsername(ctx, user.Username)
@@ -284,22 +281,22 @@ func (s *authService) RegisterByPassword(ctx context.Context, user *models.User)
 			return ErrUsernameAlreadyExists
 		}
 	}
-	
+
 	// Validate password strength (implement your own criteria)
 	if len(user.Password) < 8 {
 		return ErrWeakPassword
 	}
-	
+
 	// Set default values
 	user.Role = "user"
 	user.Active = true
-	
+
 	// Create user (password will be hashed by BeforeSave hook in User model)
 	_, err = s.userService.CreateUser(ctx, user)
 	if err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -309,28 +306,28 @@ func (s *authService) ChangePassword(ctx context.Context, userID uint, currentPa
 	if newPassword != confirmPassword {
 		return ErrPasswordMismatch
 	}
-	
+
 	// Check password strength
 	if len(newPassword) < 8 {
 		return ErrWeakPassword
 	}
-	
+
 	// Get current user
 	user, err := s.userService.GetUserByID(userID)
 	if err != nil {
 		return ErrUserNotFound
 	}
-	
+
 	// Verify current password
 	if !user.ComparePassword(currentPassword) {
 		return ErrInvalidCredentials
 	}
-	
+
 	// Check if new password is different from old password
 	if user.ComparePassword(newPassword) {
 		return ErrSamePassword
 	}
-	
+
 	// Update password
 	user.Password = newPassword
 	return s.userService.UpdateUser(ctx, user)
@@ -343,7 +340,7 @@ func generateResetToken() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
+
 	return base64.URLEncoding.EncodeToString(b), nil
 }
 
@@ -355,16 +352,16 @@ func (s *authService) RequestPasswordReset(ctx context.Context, email string) (s
 		// Don't reveal if email exists or not for security reasons
 		return "", nil
 	}
-	
+
 	// Generate reset token
 	resetToken, err := generateResetToken()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate reset token: %w", err)
 	}
-	
+
 	// Set reset token and expiration time (1 hour)
 	expiresAt := time.Now().Add(1 * time.Hour)
-	
+
 	// Store token in user record
 	user.ResetToken = resetToken
 	user.ResetTokenExpiresAt = expiresAt
@@ -372,7 +369,7 @@ func (s *authService) RequestPasswordReset(ctx context.Context, email string) (s
 	if err != nil {
 		return "", fmt.Errorf("failed to store reset token: %w", err)
 	}
-	
+
 	// In production, you would send this token via email instead of returning it
 	// For testing purposes, we're returning the token
 	return resetToken, nil
@@ -384,23 +381,23 @@ func (s *authService) ResetPassword(ctx context.Context, token, newPassword, con
 	if newPassword != confirmPassword {
 		return ErrPasswordMismatch
 	}
-	
+
 	// Check password strength
 	if len(newPassword) < 8 {
 		return ErrWeakPassword
 	}
-	
+
 	// Find user by reset token
 	user, err := s.userService.FindUserByResetToken(ctx, token)
 	if err != nil {
 		return ErrResetTokenInvalid
 	}
-	
+
 	// Check if token is expired
 	if user.ResetTokenExpiresAt.Before(time.Now()) {
 		return ErrResetTokenInvalid
 	}
-	
+
 	// Update password and clear reset token fields
 	user.Password = newPassword
 	user.ResetToken = ""

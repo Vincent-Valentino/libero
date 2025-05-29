@@ -62,7 +62,6 @@
             <h3 class="text-lg font-semibold mb-4" :style="{ color: currentLeague?.themeColor }">Top Scorers</h3>
             <div v-if="!isLoadingScorers && topScorers.length > 0" class="space-y-4">
               <div v-for="scorer in topScorers.slice(0, 5)" :key="scorer.id" class="flex items-center">
-                <img :src="scorer.photo" :alt="scorer.name" class="w-12 h-12 rounded-full mr-4 object-cover">
                 <div>
                   <div class="font-medium">{{ scorer.name }}</div>
                   <div class="text-sm text-gray-500">{{ scorer.team.name }}</div>

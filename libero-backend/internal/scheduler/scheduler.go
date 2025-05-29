@@ -1,73 +1,113 @@
 package scheduler
 
 import (
+	"context"
 	"libero-backend/internal/service"
 	"log"
 	"time"
 )
 
-// Scheduler handles periodic tasks for the application
+// Scheduler manages periodic background tasks.
 type Scheduler struct {
 	fixturesService service.FixturesService
-	stopChan        chan struct{}
-	running         bool
+	ctx             context.Context
+	cancel          context.CancelFunc
 }
 
-// New creates a new scheduler with required services
+// New creates a new scheduler.
 func New(fixturesService service.FixturesService) *Scheduler {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Scheduler{
 		fixturesService: fixturesService,
-		stopChan:        make(chan struct{}),
+		ctx:             ctx,
+		cancel:          cancel,
 	}
 }
 
-// Start begins the scheduled tasks
+// Start begins all scheduled tasks.
 func (s *Scheduler) Start() {
-	if s.running {
-		return
-	}
-	s.running = true
-	go s.run()
-	log.Println("Scheduler started")
+	// Start the task to refresh today's fixtures every 4 hours
+	go s.scheduleTodayFixtures()
+
+	// Start the task to refresh fixtures summary for all major competitions
+	go s.scheduleFixturesSummaries()
 }
 
-// Stop terminates the scheduled tasks
+// Stop terminates all scheduled tasks.
 func (s *Scheduler) Stop() {
-	if !s.running {
-		return
-	}
-	s.running = false
-	s.stopChan <- struct{}{}
-	log.Println("Scheduler stopped")
+	s.cancel()
 }
 
-// run is the main scheduler loop
-func (s *Scheduler) run() {
-	// Refresh fixtures data every 4 hours
-	refreshTicker := time.NewTicker(4 * time.Hour)
-	defer refreshTicker.Stop()
+// scheduleTodayFixtures refreshes today's fixtures every 4 hours.
+func (s *Scheduler) scheduleTodayFixtures() {
+	// First run immediately
+	s.fetchTodayFixtures()
 
-	// Immediately fetch data on startup
-	s.refreshFixtures()
+	ticker := time.NewTicker(4 * time.Hour)
+	defer ticker.Stop()
 
 	for {
 		select {
-		case <-refreshTicker.C:
-			s.refreshFixtures()
-		case <-s.stopChan:
+		case <-ticker.C:
+			s.fetchTodayFixtures()
+		case <-s.ctx.Done():
+			log.Println("Today's fixtures scheduler stopped")
 			return
 		}
 	}
 }
 
-// refreshFixtures updates fixtures data via the fixtures service
-func (s *Scheduler) refreshFixtures() {
-	log.Println("Scheduler: Refreshing fixtures data")
-	// This is a placeholder that would normally call service methods
-	// Since this is a minimal implementation, we're just logging
-	// In a real implementation, this would call methods like:
-	// _, err := s.fixturesService.GetTodaysFixtures()
-	// if err != nil {
-	//     log.Printf("Error refreshing fixtures: %v", err)
-	// }
-} 
+// scheduleFixturesSummaries refreshes fixtures summaries for major competitions every 6 hours.
+func (s *Scheduler) scheduleFixturesSummaries() {
+	// Major competition codes
+	comps := []string{"PL", "PD", "SA", "BL1", "FL1", "CL", "EL"}
+
+	// Wait 15 seconds before starting to avoid overwhelming the API on startup
+	time.Sleep(15 * time.Second)
+
+	// First run immediately
+	for _, comp := range comps {
+		s.fetchFixturesSummary(comp)
+		// Wait between requests
+		time.Sleep(5 * time.Second)
+	}
+
+	ticker := time.NewTicker(6 * time.Hour)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			for _, comp := range comps {
+				s.fetchFixturesSummary(comp)
+				// Wait between requests to not hit rate limits
+				time.Sleep(5 * time.Second)
+			}
+		case <-s.ctx.Done():
+			log.Println("Fixtures summaries scheduler stopped")
+			return
+		}
+	}
+}
+
+// fetchTodayFixtures gets today's fixtures and logs any errors.
+func (s *Scheduler) fetchTodayFixtures() {
+	log.Println("Scheduler: Refreshing today's fixtures")
+	_, err := s.fixturesService.GetTodaysFixtures()
+	if err != nil {
+		log.Printf("Scheduler: Error refreshing today's fixtures: %v", err)
+	} else {
+		log.Println("Scheduler: Today's fixtures refreshed successfully")
+	}
+}
+
+// fetchFixturesSummary gets fixtures summary for a competition and logs any errors.
+func (s *Scheduler) fetchFixturesSummary(competitionCode string) {
+	log.Printf("Scheduler: Refreshing fixtures summary for %s", competitionCode)
+	_, err := s.fixturesService.GetFixturesSummary(competitionCode)
+	if err != nil {
+		log.Printf("Scheduler: Error refreshing fixtures summary for %s: %v", competitionCode, err)
+	} else {
+		log.Printf("Scheduler: Fixtures summary for %s refreshed successfully", competitionCode)
+	}
+}

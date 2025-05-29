@@ -1,8 +1,10 @@
 <template>
   <div class="min-h-screen flex items-center justify-center">
     <div class="text-center p-8">
+      <div class="mb-4">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+      </div>
       <h2 class="text-2xl font-semibold mb-4">Processing login...</h2>
-      <!-- Optional: Add a loading spinner -->
       <p v-if="error" class="text-red-500">{{ error }}</p>
     </div>
   </div>
@@ -29,7 +31,6 @@ onMounted(async () => {
   // Use replaceState to avoid adding a new entry to the browser history
   history.replaceState(null, '', window.location.pathname + window.location.search);
 
-
   if (token) {
     console.log('OAuth Callback: Token found in hash.');
     try {
@@ -38,9 +39,9 @@ onMounted(async () => {
 
       // After handleAuthCallback completes, check the store's state
       if (authStore.isAuthenticated && authStore.user) {
-        console.log('OAuth Callback: handleAuthCallback successful. Redirecting to Home.');
-        // Redirect to the root page or intended destination
-        router.push({ name: 'Home' }); // Or potentially a stored 'redirectAfterLogin' path
+        console.log('OAuth Callback: handleAuthCallback successful. Redirecting to Profile.');
+        // Redirect to the profile page for successful OAuth login
+        router.push({ name: 'profile' });
       } else {
         // This case means handleAuthCallback finished but the user is not authenticated
         // (likely because the profile fetch within it failed and triggered logout)

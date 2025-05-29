@@ -11,6 +11,7 @@ type Controller struct {
 	User       *UserController
 	Oauth      *OAuthController
 	SportsData *SportsDataController
+	Prediction *PredictionController
 }
 
 // New creates a new service instance with all services
@@ -19,5 +20,6 @@ func New(service *serv.Service, cfg *config.Config, repo *repository.Repository)
 		User:       NewUserController(service.User, service.Auth),
 		Oauth:      NewOAuthController(service.OAuth, cfg),
 		SportsData: NewSportsDataController(service.ML, service.Fixtures, service.Football, repo.Cache),
+		Prediction: NewPredictionController(cfg),
 	}
 }

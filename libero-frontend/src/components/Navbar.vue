@@ -12,17 +12,16 @@
         <router-link to="/leagues/SA" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Serie A</router-link>
         <router-link to="/leagues/BL1" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Bundesliga</router-link>
         <router-link to="/leagues/FL1" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Ligue 1</router-link>
-        <router-link to="/leagues/CL" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">UCL</router-link>
-        <router-link to="/leagues/EL" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">UEL</router-link>
-        <router-link to="/player" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Player</router-link>
-        <router-link to="/team" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Team</router-link>
-        <router-link to="/nations" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Nations</router-link>
-        <router-link to="/awards" class="text-xs uppercase font-medium hover:text-gray-500 transition-colors">Awards</router-link>
       </div>
 
       <!-- Conditional Sign In / Logout Button (Desktop) -->
-      <router-link v-if="!authStore.isAuthenticated" to="/auth" class="hidden md:block ml-auto bg-black rounded-md text-white text-sm font-medium tracking-wide px-4 py-1.5 cursor-pointer hover:bg-gray-800 transition-colors">SIGN IN</router-link>
-      <button v-else @click="handleLogout" class="hidden md:block ml-auto bg-red-600 rounded-md text-white text-sm font-medium tracking-wide px-4 py-1.5 cursor-pointer hover:bg-red-700 transition-colors">LOG OUT</button>
+      <div v-if="!authStore.isAuthenticated" class="hidden md:block ml-auto">
+        <router-link to="/auth" class="bg-black rounded-md text-white text-sm font-medium tracking-wide px-4 py-1.5 cursor-pointer hover:bg-gray-800 transition-colors">SIGN IN</router-link>
+      </div>
+      <div v-else class="hidden md:flex ml-auto gap-2">
+        <router-link to="/profile" class="bg-blue-600 rounded-md text-white text-sm font-medium tracking-wide px-4 py-1.5 cursor-pointer hover:bg-blue-700 transition-colors">PROFILE</router-link>
+        <button @click="handleLogout" class="bg-red-600 rounded-md text-white text-sm font-medium tracking-wide px-4 py-1.5 cursor-pointer hover:bg-red-700 transition-colors">LOG OUT</button>
+      </div>
 
       <!-- Mobile Menu Button -->
       <button
@@ -73,8 +72,13 @@
           <router-link @click="closeMenu" to="/nations" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">Nations</router-link>
           <router-link @click="closeMenu" to="/awards" class="py-1.5 text-xs uppercase font-medium hover:text-gray-500 transition-colors">Awards</router-link>
           <!-- Conditional Sign In / Logout Button (Mobile) -->
-          <router-link v-if="!authStore.isAuthenticated" @click="closeMenu" to="/auth" class="mt-4 w-full text-center bg-black rounded-md text-white text-xs font-medium tracking-wide px-4 py-1.5 cursor-pointer hover:bg-gray-800 transition-colors">SIGN IN</router-link>
-          <button v-else @click="handleLogout" class="mt-4 w-full bg-red-600 rounded-md text-white text-xs font-medium tracking-wide px-4 py-1.5 cursor-pointer hover:bg-red-700 transition-colors">LOG OUT</button>
+          <div v-if="!authStore.isAuthenticated" class="mt-4">
+            <router-link @click="closeMenu" to="/auth" class="w-full text-center bg-black rounded-md text-white text-xs font-medium tracking-wide px-4 py-1.5 cursor-pointer hover:bg-gray-800 transition-colors block">SIGN IN</router-link>
+          </div>
+          <div v-else class="mt-4 flex flex-col gap-2">
+            <router-link @click="closeMenu" to="/profile" class="w-full text-center bg-blue-600 rounded-md text-white text-xs font-medium tracking-wide px-4 py-1.5 cursor-pointer hover:bg-blue-700 transition-colors block">PROFILE</router-link>
+            <button @click="handleLogout" class="w-full bg-red-600 rounded-md text-white text-xs font-medium tracking-wide px-4 py-1.5 cursor-pointer hover:bg-red-700 transition-colors">LOG OUT</button>
+          </div>
         </div>
       </aside> <!-- Closing aside -->
     </Transition>

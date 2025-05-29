@@ -16,7 +16,6 @@
           </div>
           <div v-if="item.topScorer" class="flex items-center space-x-2">
             <span class="font-medium w-24 inline-block">Top Scorer:</span>
-            <img :src="item.topScorer.photo" :alt="item.topScorer.name" class="h-5 w-5 rounded-full object-cover inline-block">
             <span>{{ item.topScorer.name }} ({{ item.topScorer.value }} goals)</span>
           </div>
            <div v-if="item.bestPlayer" class="flex items-center space-x-2">
