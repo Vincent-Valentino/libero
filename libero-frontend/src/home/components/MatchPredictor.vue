@@ -102,8 +102,26 @@
               <div class="space-y-2 mb-6">
                 <div class="text-gray-700">Expected Goals: {{ prediction.expected_home_goals.toFixed(1) }} - {{ prediction.expected_away_goals.toFixed(1) }}</div>
                 <div class="text-indigo-700 font-bold text-lg">{{ getPredictionResult() }}</div>
+                <div v-if="savingToHistory" class="text-sm text-blue-600 font-medium flex items-center justify-center gap-1 mt-3">
+                  <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Saving to your prediction history...
+                </div>
+                <div v-else-if="savedToHistory" class="text-sm text-green-600 font-medium flex items-center justify-center gap-1 mt-3">
+                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                  </svg>
+                  Automatically saved to your prediction history
+                </div>
+                <div v-else class="text-sm text-gray-500 font-medium flex items-center justify-center gap-1 mt-3">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  Auto-saves to prediction history
+                </div>
               </div>
-              <div class="grid grid-cols-3 gap-3">
+              <div class="grid grid-cols-3 gap-3 mb-4">
                 <div class="bg-white rounded-lg p-4 border border-green-200">
                   <div class="font-semibold text-gray-800">Home Win</div>
                   <div class="text-2xl font-bold text-green-600">{{ (prediction.probabilities.home_win * 100).toFixed(0) }}%</div>
@@ -116,6 +134,19 @@
                   <div class="font-semibold text-gray-800">Away Win</div>
                   <div class="text-2xl font-bold text-red-600">{{ (prediction.probabilities.away_win * 100).toFixed(0) }}%</div>
                 </div>
+              </div>
+              
+              <!-- Action Buttons -->
+              <div class="flex gap-3 justify-center">
+                <router-link 
+                  to="/profile" 
+                  class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  View History
+                </router-link>
               </div>
             </div>
 
@@ -212,8 +243,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted } from 'vue';
 import { predictMatch, getAvailableTeams, getAvailableLeagues, type PredictMatchResponse } from '@/services/api';
+import { usePredictionStore } from '@/stores/prediction';
 
 // Types
 interface Team {
@@ -235,6 +267,8 @@ const loading = ref(true);
 const error = ref('');
 const predicting = ref(false);
 const predictionError = ref('');
+const savingToHistory = ref(false);
+const savedToHistory = ref(false);
 
 const allTeams = ref<Team[]>([]);
 const availableLeagues = ref<string[]>([]);
@@ -246,6 +280,8 @@ const selectedHomeTeam = ref<Team | null>(null);
 const selectedAwayTeam = ref<Team | null>(null);
 
 const prediction = ref<PredictMatchResponse | null>(null);
+
+const predictionStore = usePredictionStore();
 
 // League display name mapping
 const leagueDisplayNames: Record<string, string> = {
@@ -266,10 +302,10 @@ const featuredMatchups: MatchSuggestion[] = [
   { id: '1', home: 'Barcelona', away: 'Real Madrid', homeLeague: 'SP1', awayLeague: 'SP1', description: 'El Clasico' },
   { id: '2', home: 'Manchester United', away: 'Manchester City', homeLeague: 'E0', awayLeague: 'E0', description: 'Manchester Derby' },
   { id: '3', home: 'Liverpool', away: 'Arsenal', homeLeague: 'E0', awayLeague: 'E0', description: 'Premier League Classic' },
-  { id: '4', home: 'AC Milan', away: 'Inter Milan', homeLeague: 'I1', awayLeague: 'I1', description: 'Derby della Madonnina' },
+  { id: '4', home: 'Milan', away: 'Inter', homeLeague: 'I1', awayLeague: 'I1', description: 'Derby della Madonnina' },
   { id: '5', home: 'Bayern Munich', away: 'Borussia Dortmund', homeLeague: 'D1', awayLeague: 'D1', description: 'Der Klassiker' },
-  { id: '6', home: 'Paris Saint-Germain', away: 'Olympique Marseille', homeLeague: 'F1', awayLeague: 'F1', description: 'Le Classique' },
-  { id: '7', home: 'Juventus', away: 'AS Roma', homeLeague: 'I1', awayLeague: 'I1', description: 'North vs South Italy' },
+  { id: '6', home: 'PSG', away: 'Marseille', homeLeague: 'F1', awayLeague: 'F1', description: 'Le Classique' },
+  { id: '7', home: 'Juventus', away: 'Roma', homeLeague: 'I1', awayLeague: 'I1', description: 'North vs South Italy' },
   { id: '8', home: 'Chelsea', away: 'Tottenham', homeLeague: 'E0', awayLeague: 'E0', description: 'London Derby' },
   { id: '9', home: 'Atletico Madrid', away: 'Real Madrid', homeLeague: 'SP1', awayLeague: 'SP1', description: 'Madrid Derby' }
 ];
@@ -349,7 +385,7 @@ const loadData = async () => {
     ]);
     
     // Build team-league mapping from teams data
-    allTeams.value = buildTeamLeagueMapping(teams, leagues);
+    allTeams.value = buildTeamLeagueMapping(teams);
     availableLeagues.value = leagues.sort();
     
     // Set default league tabs
@@ -370,7 +406,7 @@ const loadData = async () => {
   }
 };
 
-const buildTeamLeagueMapping = (teams: string[], leagues: string[]): Team[] => {
+const buildTeamLeagueMapping = (teams: string[]): Team[] => {
   // Extended team-league mapping with more comprehensive team coverage
   const teamLeagueMap: Record<string, string> = {
     // Premier League teams (E0)
@@ -446,6 +482,8 @@ const buildTeamLeagueMapping = (teams: string[], leagues: string[]): Team[] => {
 const clearPrediction = () => {
   prediction.value = null;
   predictionError.value = '';
+  savedToHistory.value = false;
+  savingToHistory.value = false;
 };
 
 const generatePrediction = async () => {
@@ -455,6 +493,7 @@ const generatePrediction = async () => {
   
   predicting.value = true;
   predictionError.value = '';
+  savedToHistory.value = false;
   
   try {
     // For cross-league matches, we'll use the home team's league as the context
@@ -474,6 +513,32 @@ const generatePrediction = async () => {
     
     prediction.value = result;
     console.log('Prediction result:', result);
+    
+    // Automatically save to history after successful prediction
+    savingToHistory.value = true;
+    try {
+      await predictionStore.savePrediction({
+        homeTeam: selectedHomeTeam.value.name,
+        awayTeam: selectedAwayTeam.value.name,
+        homeLeague: selectedHomeTeam.value.league,
+        awayLeague: selectedAwayTeam.value.league,
+        predictedHomeScore: result.most_likely_home_score,
+        predictedAwayScore: result.most_likely_away_score,
+        expectedHomeGoals: result.expected_home_goals,
+        expectedAwayGoals: result.expected_away_goals,
+        homeWinProbability: result.probabilities.home_win,
+        drawProbability: result.probabilities.draw,
+        awayWinProbability: result.probabilities.away_win,
+        predictedResult: getPredictionResult(),
+      });
+      savedToHistory.value = true;
+      console.log('✅ Prediction automatically saved to history');
+    } catch (saveError) {
+      console.warn('⚠️ Failed to save prediction to history, but prediction was successful:', saveError);
+      // Don't throw the error as the prediction itself was successful
+    } finally {
+      savingToHistory.value = false;
+    }
     
   } catch (err: any) {
     console.error('Error making prediction:', err);

@@ -1,5 +1,8 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
 
+// Backend URLs
+const BACKEND_BASE_URL = 'http://localhost:8080'; // Only used for OAuth
+
 // Create axios instance with custom config
 const apiClient: AxiosInstance = axios.create({
   baseURL: 'http://localhost:8080/api', // Update to match your backend URL
@@ -71,6 +74,15 @@ apiClient.interceptors.response.use(
     } else {
       console.error('API Error:', error.message);
     }
+
+    if (error.response && error.response.status === 401) {
+      // Handle unauthorized access - e.g., clear token, redirect to login
+      console.warn('Unauthorized access detected. Clearing token.');
+      localStorage.removeItem('authToken');
+      // Redirect to root page
+      window.location.href = '/';
+    }
+
     return Promise.reject(error);
   }
 );
@@ -85,10 +97,22 @@ interface LoginResponse {
   token: string;
 }
 
-interface RegisterUserData {
+export interface RegisterUserData {
+  name: string;
   username: string;
   email: string;
   password: string;
+}
+
+// Response from registration endpoint (matches backend UserResponse)
+export interface UserResponse {
+  id: number;
+  username: string;
+  email: string;
+  name?: string;
+  role: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // Define a basic user profile structure (adjust based on backend's UserResponse)
@@ -201,48 +225,6 @@ export interface PlayerStat {
   photo: string;
 }
 
-// Base URL for the backend API
-// Backend URLs
-const BACKEND_BASE_URL = 'http://localhost:8080'; // Only used for OAuth
-
-// Request Interceptor: Add JWT token to headers if available
-apiClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
-    const token: string | null = localStorage.getItem('authToken'); // Or sessionStorage
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error: any): Promise<any> => {
-    return Promise.reject(error);
-  }
-);
-
-// Response Interceptor: Handle common errors (e.g., 401 Unauthorized)
-apiClient.interceptors.response.use(
-  (response: AxiosResponse): AxiosResponse => {
-    // Any status code that lie within the range of 2xx cause this function to trigger
-    return response;
-  },
-  (error: any): Promise<any> => {
-    // Any status codes that falls outside the range of 2xx cause this function to trigger
-    console.error('API Error:', error.response?.data || error.message);
-
-    if (error.response && error.response.status === 401) {
-      // Handle unauthorized access - e.g., clear token, redirect to login
-      console.warn('Unauthorized access detected. Clearing token.');
-      localStorage.removeItem('authToken'); // Or sessionStorage
-      // Redirect to root page
-      window.location.href = '/'; // <--- Changed & Uncommented
-      // Optionally, could use router.push('/') if router instance is available here
-    }
-
-    // Return the error so it can be caught by the calling code
-    return Promise.reject(error);
-  }
-);
-
 // --- Authentication API Calls ---
 
 /**
@@ -260,9 +242,42 @@ export const loginUser = (credentials: LoginCredentials): Promise<LoginResponse>
  * @param userData - { username, email, password }
  * @returns Promise containing the registered user's profile (adjust type based on actual response)
  */
-export const registerUser = (userData: RegisterUserData): Promise<UserProfile> => {
+export const registerUser = (userData: RegisterUserData): Promise<UserResponse> => {
+  console.log('[API] Registration request for user:', userData.username);
+  
   // Assuming registration returns the user profile upon success
-  return apiClient.post<UserProfile>('/auth/register', userData)
+  return apiClient.post<UserResponse>('/auth/register', userData)
+    .then(response => {
+      console.log('[API] Registration successful for:', userData.username);
+      return response.data;
+    })
+    .catch(error => {
+      console.error('[API] Registration failed:', error.response?.data || error.message);
+      throw error;
+    });
+};
+
+/**
+ * Requests a password reset token for the given email.
+ * @param email - User's email address
+ * @returns Promise containing the response message and token (for testing)
+ */
+export const requestPasswordReset = (email: string): Promise<{ message: string; token?: string }> => {
+  return apiClient.post<{ message: string; token?: string }>('/auth/forgot-password', { email })
+    .then(response => response.data);
+};
+
+/**
+ * Resets user password using a reset token.
+ * @param resetData - { token, new_password, confirm_password }
+ * @returns Promise containing the success message
+ */
+export const resetPassword = (resetData: {
+  token: string;
+  new_password: string;
+  confirm_password: string;
+}): Promise<{ message: string }> => {
+  return apiClient.post<{ message: string }>('/auth/reset-password', resetData)
     .then(response => response.data);
 };
 

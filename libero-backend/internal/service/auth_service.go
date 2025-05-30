@@ -298,14 +298,22 @@ func (s *authService) ValidateJWTToken(tokenString string) (*JWTClaims, error) {
 func (s *authService) RegisterByPassword(ctx context.Context, user *models.User) error {
 	// Check if email already exists
 	existingUser, err := s.userService.FindUserByEmail(ctx, user.Email)
-	if err == nil && existingUser != nil {
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		// If there's a database error (not just "not found"), return it
+		return fmt.Errorf("error checking email availability: %w", err)
+	}
+	if existingUser != nil {
 		return ErrEmailAlreadyExists
 	}
 
 	// Check if username already exists
 	if user.Username != "" {
 		existingUser, err = s.userService.FindUserByUsername(ctx, user.Username)
-		if err == nil && existingUser != nil {
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			// If there's a database error (not just "not found"), return it
+			return fmt.Errorf("error checking username availability: %w", err)
+		}
+		if existingUser != nil {
 			return ErrUsernameAlreadyExists
 		}
 	}

@@ -30,24 +30,50 @@ func NewUserController(userService service.UserService, authService service.Auth
 
 // Register handles user registration requests
 func (c *UserController) Register(w http.ResponseWriter, r *http.Request) {
-	var user models.User
+	ctx := r.Context() // Get context
+
+	// Define a separate struct for registration request
+	var registrationRequest struct {
+		Name     string `json:"name"`
+		Username string `json:"username"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
 
 	// Parse request body
-	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&registrationRequest); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
 	// Validate required fields
-	// i think this part is wrong, because we haven't defined the fields in the struct yet
-	if user.Email == "" || user.Username == "" || user.Password == "" {
-		http.Error(w, "Email, username and password are required", http.StatusBadRequest)
+	if registrationRequest.Email == "" || registrationRequest.Username == "" || registrationRequest.Password == "" || registrationRequest.Name == "" {
+		http.Error(w, "Name, email, username and password are required", http.StatusBadRequest)
 		return
 	}
 
-	// Register user
-	if err := c.service.RegisterUser(&user); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	// Create user model from registration request
+	user := &models.User{
+		Name:     registrationRequest.Name,
+		Email:    registrationRequest.Email,
+		Username: registrationRequest.Username,
+		Password: registrationRequest.Password, // This will be hashed by BeforeSave hook
+	}
+
+	// Register user using AuthService
+	if err := c.authService.RegisterByPassword(ctx, user); err != nil {
+		// Handle specific registration errors
+		if errors.Is(err, service.ErrEmailAlreadyExists) {
+			http.Error(w, "Email address already in use", http.StatusConflict)
+		} else if errors.Is(err, service.ErrUsernameAlreadyExists) {
+			http.Error(w, "Username already in use", http.StatusConflict)
+		} else if errors.Is(err, service.ErrWeakPassword) {
+			http.Error(w, "Password does not meet security requirements (minimum 8 characters)", http.StatusBadRequest)
+		} else {
+			// Log the actual error for debugging
+			// TODO: Replace with structured logging
+			http.Error(w, "Failed to create user account", http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -91,6 +117,94 @@ func (c *UserController) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Return the JWT token
 	utils.RespondWithJSON(w, http.StatusOK, map[string]string{"token": token})
+}
+
+// RequestPasswordReset handles password reset requests
+func (c *UserController) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var request struct {
+		Email string `json:"email"`
+	}
+
+	// Parse request body
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	// Validate required fields
+	if request.Email == "" {
+		http.Error(w, "Email is required", http.StatusBadRequest)
+		return
+	}
+
+	// Request password reset token
+	token, err := c.authService.RequestPasswordReset(ctx, request.Email)
+	if err != nil {
+		// Log error but don't reveal to user for security
+		// TODO: Add structured logging
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// For testing purposes, return the token
+	// In production, this would send an email instead
+	if token != "" {
+		utils.RespondWithJSON(w, http.StatusOK, map[string]string{
+			"message": "Password reset token generated",
+			"token":   token, // Remove this in production
+		})
+	} else {
+		// Email not found, but don't reveal this for security
+		utils.RespondWithJSON(w, http.StatusOK, map[string]string{
+			"message": "If the email exists, a password reset token has been sent",
+		})
+	}
+}
+
+// ResetPassword handles password reset completion
+func (c *UserController) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var request struct {
+		Token           string `json:"token"`
+		NewPassword     string `json:"new_password"`
+		ConfirmPassword string `json:"confirm_password"`
+	}
+
+	// Parse request body
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	// Validate required fields
+	if request.Token == "" || request.NewPassword == "" || request.ConfirmPassword == "" {
+		http.Error(w, "Token, new password, and confirm password are required", http.StatusBadRequest)
+		return
+	}
+
+	// Reset password
+	err := c.authService.ResetPassword(ctx, request.Token, request.NewPassword, request.ConfirmPassword)
+	if err != nil {
+		if errors.Is(err, service.ErrPasswordMismatch) {
+			http.Error(w, "Passwords do not match", http.StatusBadRequest)
+		} else if errors.Is(err, service.ErrWeakPassword) {
+			http.Error(w, "Password does not meet security requirements (minimum 8 characters)", http.StatusBadRequest)
+		} else if errors.Is(err, service.ErrResetTokenInvalid) {
+			http.Error(w, "Invalid or expired reset token", http.StatusBadRequest)
+		} else {
+			// Log error
+			// TODO: Add structured logging
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	utils.RespondWithJSON(w, http.StatusOK, map[string]string{
+		"message": "Password reset successfully",
+	})
 }
 
 // GetUserProfile handles requests to get the current user's profile including preferences

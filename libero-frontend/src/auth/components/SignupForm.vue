@@ -2,6 +2,13 @@
   <Form class="mt-8 space-y-6" @submit="handleSignup" :validation-schema="schema">
     <div class="space-y-4">
       <div class="relative pb-4"> <!-- Added padding-bottom for error message space -->
+        <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+        <Field id="name" name="name" type="text" autocomplete="name"
+               class="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-amber-500 focus:border-amber-500 focus:z-10 sm:text-sm"
+               placeholder="Enter your full name" />
+        <ErrorMessage name="name" class="absolute text-xs text-red-600 bottom-0 left-0" />
+      </div>
+      <div class="relative pb-4"> <!-- Added padding-bottom for error message space -->
         <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
         <Field id="username" name="username" type="text" autocomplete="username"
                class="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-amber-500 focus:border-amber-500 focus:z-10 sm:text-sm"
@@ -52,10 +59,12 @@
 import { Form, Field, ErrorMessage } from 'vee-validate';
 import * as yup from 'yup';
 import { useAuthStore } from '@/stores/auth'; // Import auth store
+import { registerUser } from '@/services/api'; // Import API function as fallback
 import { ref } from 'vue'; // Import ref for status messages
 
 // Define validation schema using Yup
 const schema = yup.object({
+  name: yup.string().required('Name is required'),
   username: yup.string().required('Username is required').min(3, 'Username must be at least 3 characters'),
   email: yup.string().required('Email is required').email('Must be a valid email address'),
   password: yup.string().required('Password is required').min(8, 'Password must be at least 8 characters'),
@@ -76,22 +85,42 @@ const handleSignup = async (values: Record<string, any>, { setErrors }: { setErr
   signupSuccess.value = false;
   setErrors({}); // Clear previous vee-validate errors
 
-  console.log('Signup attempt with validated values:', values);
+  console.log('Signup attempt with values:', values);
+  
+  // Validate that we have the required fields
+  if (!values.name || !values.username || !values.email || !values.password) {
+    console.error('Missing required fields');
+    signupError.value = 'Please fill in all required fields';
+    return;
+  }
+  
+  const userData = {
+    name: values.name,
+    username: values.username,
+    email: values.email,
+    password: values.password,
+  };
+  
   try {
-    await authStore.register({
-      username: values.username,
-      email: values.email,
-      password: values.password,
-    });
+    if (typeof authStore.register === 'function') {
+      await authStore.register(userData);
+    } else {
+      // Fallback to direct API call
+      console.log('Using direct API call');
+      authStore.loading = true;
+      try {
+        await registerUser(userData);
+      } finally {
+        authStore.loading = false;
+      }
+    }
+    
     console.log('Signup successful');
     signupSuccess.value = true;
-    // Optionally redirect after a delay or let the user click a link/toggle form
-    // setTimeout(() => { /* Maybe toggle to login form? */ }, 3000);
 
   } catch (error: any) {
     console.error('Signup failed:', error);
     signupSuccess.value = false;
-    // Attempt to extract a meaningful message from the error
     const message = error?.response?.data?.message || error?.response?.data || error?.message || 'Registration failed. Please try again.';
 
     // Try to map common errors to specific fields using setErrors

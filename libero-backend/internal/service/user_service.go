@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"libero-backend/config"              // Added config import
 	"libero-backend/internal/models"     // Assuming user model is here
@@ -20,10 +19,7 @@ type UserService interface {
 	UpdateUser(ctx context.Context, user *models.User) error
 
 	// Used by UserController
-	RegisterUser(user *models.User) error             // Used in Register handler
-	LoginUser(email, password string) (string, error) // Used in Login handler (returns token)
-	GetUserByID(id uint) (*models.User, error)        // Used in GetProfile, GetUser handlers
-	// UpdateUser signature kept as is for now, controller call needs fixing
+	GetUserByID(id uint) (*models.User, error)               // Used in GetProfile, GetUser handlers
 	ListUsers(page, limit int) ([]models.User, int64, error) // Used in ListUsers handler
 	DeleteUser(id uint) error                                // Used in DeleteUser handler
 
@@ -81,28 +77,6 @@ func (s *userService) UpdateUser(ctx context.Context, user *models.User) error {
 }
 
 // --- Placeholder implementations for new interface methods ---
-
-func (s *userService) RegisterUser(user *models.User) error {
-	fmt.Printf("UserService: Registering user (placeholder): Email=%s\n", user.Email)
-	// Placeholder: Hash password, call CreateUser
-	// _, err := s.CreateUser(context.Background(), user) // Example call
-	// return err
-	return nil
-}
-
-func (s *userService) LoginUser(email, password string) (string, error) {
-	fmt.Printf("UserService: Logging in user (placeholder): Email=%s\n", email)
-	// Placeholder: Find user by email, compare password, generate token
-	// user, err := s.FindUserByEmail(context.Background(), email)
-	// if err != nil { return "", err }
-	// if !user.ComparePassword(password) { return "", errors.New("invalid credentials") }
-	// token := "dummy-jwt-token-for-" + email // Replace with actual token generation
-	// return token, nil
-	if email == "existing@example.com" && password == "password" {
-		return "dummy-jwt-token-for-" + email, nil
-	}
-	return "", errors.New("invalid credentials (placeholder)")
-}
 
 func (s *userService) ListUsers(page, limit int) ([]models.User, int64, error) {
 	fmt.Printf("UserService: Listing users (placeholder): Page=%d, Limit=%d\n", page, limit)

@@ -7,12 +7,13 @@ import (
 
 // Service provides access to all service operations
 type Service struct {
-	User     UserService
-	Auth     AuthService
-	OAuth    OAuthService
-	ML       MLService
-	Fixtures FixturesService
-	Football *FootballService // Add Football service
+	User              UserService
+	Auth              AuthService
+	OAuth             OAuthService
+	ML                MLService
+	Fixtures          FixturesService
+	Football          *FootballService // Add Football service
+	PredictionHistory PredictionHistoryService
 }
 
 // New creates a new service instance with all services
@@ -29,11 +30,12 @@ func New(repo *repository.Repository) *Service {
 	footballService := NewFootballService(cfg.ThirdPartyBaseURL, cfg.ThirdPartyAPIKey) // Initialize with API config
 
 	return &Service{
-		User:     userService,
-		Auth:     authService,
-		OAuth:    oauthService,
-		ML:       mlService,
-		Fixtures: fixturesService,
-		Football: footballService, // Add to returned service
+		User:              userService,
+		Auth:              authService,
+		OAuth:             oauthService,
+		ML:                mlService,
+		Fixtures:          fixturesService,
+		Football:          footballService, // Add to returned service
+		PredictionHistory: NewPredictionHistoryService(repo.PredictionHistory),
 	}
 }

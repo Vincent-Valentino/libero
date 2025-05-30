@@ -70,7 +70,7 @@ export const useProfileStore = defineStore('profile', {
       this.error = null;
       try {
         // Call the API to update preferences
-        const response = await updateUserPreferences(payload);
+        await updateUserPreferences(payload);
 
         // Option 1: Re-fetch the entire profile to ensure data consistency
         await this.fetchProfile();

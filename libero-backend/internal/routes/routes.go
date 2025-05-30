@@ -38,6 +38,8 @@ func SetupRoutes(router *mux.Router, service *service.Service, cfg *config.Confi
 	api.HandleFunc("/health", healthCheck).Methods(http.MethodGet, http.MethodOptions)
 	api.HandleFunc("/auth/register", ctrl.User.Register).Methods(http.MethodPost, http.MethodOptions)
 	api.HandleFunc("/auth/login", ctrl.User.Login).Methods(http.MethodPost, http.MethodOptions)
+	api.HandleFunc("/auth/forgot-password", ctrl.User.RequestPasswordReset).Methods(http.MethodPost, http.MethodOptions)
+	api.HandleFunc("/auth/reset-password", ctrl.User.ResetPassword).Methods(http.MethodPost, http.MethodOptions)
 
 	// Sports data routes
 	api.HandleFunc("/sports/fixtures/today", ctrl.SportsData.HandleGetTodaysFixtures).Methods(http.MethodGet, http.MethodOptions)
@@ -73,4 +75,11 @@ func SetupRoutes(router *mux.Router, service *service.Service, cfg *config.Confi
 	// User routes
 	protected.HandleFunc("/users/profile", ctrl.User.GetUserProfile).Methods(http.MethodGet, http.MethodOptions)
 	protected.HandleFunc("/users/preferences", ctrl.User.UpdateUserPreferences).Methods(http.MethodPut, http.MethodOptions)
+
+	// Prediction history routes
+	protected.HandleFunc("/predictions", ctrl.PredictionHistory.CreatePrediction).Methods(http.MethodPost, http.MethodOptions)
+	protected.HandleFunc("/predictions", ctrl.PredictionHistory.GetPredictions).Methods(http.MethodGet, http.MethodOptions)
+	protected.HandleFunc("/predictions", ctrl.PredictionHistory.DeleteAllPredictions).Methods(http.MethodDelete, http.MethodOptions)
+	protected.HandleFunc("/predictions/{id}", ctrl.PredictionHistory.DeletePrediction).Methods(http.MethodDelete, http.MethodOptions)
+	protected.HandleFunc("/predictions/statistics", ctrl.PredictionHistory.GetPredictionStatistics).Methods(http.MethodGet, http.MethodOptions)
 }

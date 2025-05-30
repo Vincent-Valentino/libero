@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 // Import API functions and types
-import { loginUser, getUserProfile, type LoginCredentials, type UserProfile } from '@/services/api'; // Use @ alias for cleaner imports
+import { loginUser, registerUser, getUserProfile, type LoginCredentials, type RegisterUserData, type UserProfile } from '@/services/api'; // Use @ alias for cleaner imports
 
 // User interface is now imported as UserProfile
 
@@ -148,6 +148,27 @@ export const useAuthStore = defineStore('auth', {
     // Action to clear errors
     clearError() {
         this.error = null;
-    }
+    },
+
+    // Action to register a new user
+    async register(userData: RegisterUserData) {
+      this.loading = true;
+      this.error = null;
+      try {
+        // Call the registerUser function from api.ts
+        // Registration returns user profile but doesn't automatically log in
+        await registerUser(userData);
+        
+        // Registration successful - user needs to login separately
+        // Don't set authentication state here since registration != login
+        
+      } catch (err: any) {
+        // Error handling for registration errors
+        this.error = err.response?.data?.message || err.message || 'Registration failed';
+        throw err; // Re-throw so the component can handle specific errors
+      } finally {
+        this.loading = false;
+      }
+    },
   },
 });

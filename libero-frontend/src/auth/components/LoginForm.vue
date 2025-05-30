@@ -21,9 +21,9 @@
     <div class="flex items-center justify-end mt-6"> <!-- Changed justify-between to justify-end -->
       <!-- Removed remember me checkbox for simplicity -->
       <div class="text-sm">
-        <a href="#" class="font-medium text-amber-500 hover:text-amber-600">
+        <button @click="$emit('forgot-password')" type="button" class="font-medium text-amber-500 hover:text-amber-600">
           Forgot your password?
-        </a>
+        </button>
       </div>
     </div>
 
@@ -53,14 +53,17 @@ const router = useRouter();
 const authStore = useAuthStore();
 const loginError = ref<string | null>(null); // To display general login errors
 
+// Define emits
+defineEmits(['forgot-password']);
+
 const handleLogin = async (values: any) => { // Removed setErrors from signature
   loginError.value = null; // Clear previous errors
   try {
     await authStore.login({ email: values.email,
  password: values.password });
     console.log('Login successful, redirecting...');
-    // Redirect to profile or home page after successful login
-    router.push({ name: 'Profile' }); // Or 'Home'
+    // Redirect to home page after successful login
+    router.push({ name: 'Home' });
   } catch (error: any) {
     console.error('Login failed in component:', error);
     // Display error message to the user
