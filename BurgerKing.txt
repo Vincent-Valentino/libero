@@ -1,0 +1,49 @@
+Anggota Kelompok 
+Vincent Valentino 
+Egip Sinargo
+Alvin Liandy
+Aleshi agung wicaksono
+Wiliam Zonata
+
+Deskripsi Proyek 
+Libero adalah apliasi berbasis website dimana fitur utama dari aplikasi kita adalah 
+melakukan Match Predictor untuk pertandingan sepakbola. Match Prediktor kami akan melakukan
+prediksi skior akhir menggunakan data statistik hasil pertandingan dalam 2 musim terakhir
+(2023/2024 dan 2024/2025).
+
+Proyek kami akan mencakuop 3 bagian yaitu :
+
+1. Frontend, dengan menggunakan vue + typescript
+2. Backend , dengan menggunakan Native GO + PorstgreSQL
+3. Machine Learning , FastAPI
+
+Pembagian Tugas 
+
+Vincent : Membuat tampilan home dan auth page pada frontend
+	  Meningkatkan kualitas Model dengan menambahkan data yang akan digunakan
+	  Mencari data hasil Pertandingan 
+	  Mencari ide dan membagi tugas kepada anggota
+
+Egip    : Membuat tampilan Specific Liga
+          Membuat 3rd party API untuk menghandle data realtime(pertandingan terkini)
+
+Alvin 	: Mengumpuulkan data hasil pertandingan 
+	  Membuat Model ai dengan metode Poisson
+
+Aleshi	: Membuat Dokumentasi
+	  Mengumpulkan data hasil pertandingan
+	  Mencari kebutuhan Asset dan API yang akan di gunakan
+
+William	: Mendesign tampilan website
+	  Melakukan data cleansing terhadap data yang di kumpulkan
+
+
+
+Github dan Petunjuk untuk menjalankan program
+Link Presentasi: https://mikroskilacid-my.sharepoint.com/:f:/g/personal/egip_sinargo_students_mikroskil_ac_id/EgK4IJJUb6xGgariD2itGMABtfGww4jdgAkFnL3oPlQYwA?e=oXUFsw
+Link: https://github.com/Vincent-Valentino/libero
+Petunjuk menjalankan program:
+* Jalankan frontend dengan mengetik “cd libero-frontend && pnpm run dev”
+* Jalankan backend dengan mengetik “cd libero-backend && go run main.go app.go”
+* Jalankan ai dengan mengetik "cd libero-ml && python3 main.py" (jika terdapat perbedaan device (macOS atau Windows, akan diperlukan pembuatan .venv yang baru)
+* Program akan berjalan di http://localhost:5173/ untuk frontend dan http://localhost:8080/ untuk backend
